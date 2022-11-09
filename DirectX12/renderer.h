@@ -1,8 +1,6 @@
 // minimalistic code to draw a single triangle, this is not part of the API.
 // required for compiling shaders on the fly, consider pre-compiling instead
-#include <d3dcompiler.h>
-#pragma comment(lib, "d3dcompiler.lib")
-#include "d3dx12.h" // official helper file provided by microsoft
+#include "Model.h";
 
 
 std::string ShaderAsString(const char* shaderFilePath) {
@@ -18,6 +16,7 @@ std::string ShaderAsString(const char* shaderFilePath) {
 		std::cout << "ERROR: Shader Source File \"" << shaderFilePath << "\" Not Found!" << std::endl;
 	return output;
 }
+Model test;
 // Creation, Rendering & Cleanup
 class Renderer
 {
@@ -25,8 +24,6 @@ class Renderer
 	GW::SYSTEM::GWindow win;
 	GW::GRAPHICS::GDirectX12Surface d3d;
 	// what we need at a minimum to draw a triangle
-	D3D12_VERTEX_BUFFER_VIEW					vertexView;
-	Microsoft::WRL::ComPtr<ID3D12Resource>		vertexBuffer;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>	pipeline;
 public:
@@ -37,31 +34,12 @@ public:
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 
-
-
 		// Create Vertex Buffer
-		float verts[] = {
-			   0,   0.5f,
-			 0.5f, -0.5f,
-			-0.5f, -0.5f
-		};
-		creator->CreateCommittedResource( // using UPLOAD heap for simplicity
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // DEFAULT recommend  
-			D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(sizeof(verts)),
-			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexBuffer));
-		// Transfer triangle data to the vertex buffer.
-		UINT8* transferMemoryLocation;
-		vertexBuffer->Map(0, &CD3DX12_RANGE(0, 0),
-			reinterpret_cast<void**>(&transferMemoryLocation));
-		memcpy(transferMemoryLocation, verts, sizeof(verts));
-		vertexBuffer->Unmap(0, nullptr);
-		// Create a vertex View to send to a Draw() call.
-		vertexView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-		vertexView.StrideInBytes = sizeof(float) * 2;
-		vertexView.SizeInBytes = sizeof(verts);
-
-
-
+		test.addToVertList(Vertex({ 0.0f,0.5f,0.0f }));
+		test.addToVertList(Vertex({ 0.5f,-0.5f,0.0f }));
+		test.addToVertList(Vertex({ -0.5f,-0.5f,0.0f }));
+		
+		test.createVertexBuffer(creator);
 		// Create Vertex Shader
 		UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG
@@ -70,7 +48,7 @@ public:
 		Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
 		std::string vShade = ShaderAsString("../vShader.hlsl");
 		if (FAILED(D3DCompile(vShade.c_str(), vShade.length(),
-			nullptr, nullptr, nullptr, "main", "vs_5_1", compilerFlags, 0, 
+			nullptr, nullptr, nullptr, "main", "vs_5_1", compilerFlags, 0,
 			vsBlob.GetAddressOf(), errors.GetAddressOf())))
 		{
 			std::cout << (char*)errors->GetBufferPointer() << std::endl;
@@ -83,7 +61,7 @@ public:
 		Microsoft::WRL::ComPtr<ID3DBlob> psBlob; errors.Reset();
 		std::string pShade = ShaderAsString("../pShader.hlsl");
 		if (FAILED(D3DCompile(pShade.c_str(), pShade.length(),
-			nullptr, nullptr, nullptr, "main", "ps_5_1", compilerFlags, 0, 
+			nullptr, nullptr, nullptr, "main", "ps_5_1", compilerFlags, 0,
 			psBlob.GetAddressOf(), errors.GetAddressOf())))
 		{
 			std::cout << (char*)errors->GetBufferPointer() << std::endl;
@@ -93,11 +71,16 @@ public:
 
 
 		// Create Input Layout
-		D3D12_INPUT_ELEMENT_DESC format[] = {
-			{ 
-				"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 
-				D3D12_APPEND_ALIGNED_ELEMENT, 
-				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		D3D12_INPUT_ELEMENT_DESC format[] = 
+		{
+			{
+				"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			},
+			{
+				"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			},
+			{
+				"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 			}
 		};
 
@@ -105,12 +88,12 @@ public:
 
 		// create root signature
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr, 
+		rootSignatureDesc.Init(0, nullptr, 0, nullptr,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		Microsoft::WRL::ComPtr<ID3DBlob> signature;
-		D3D12SerializeRootSignature(&rootSignatureDesc, 
+		D3D12SerializeRootSignature(&rootSignatureDesc,
 			D3D_ROOT_SIGNATURE_VERSION_1, &signature, &errors);
-		creator->CreateRootSignature(0, signature->GetBufferPointer(), 
+		creator->CreateRootSignature(0, signature->GetBufferPointer(),
 			signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 
@@ -149,7 +132,7 @@ public:
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 		// now we can draw
-		cmd->IASetVertexBuffers(0, 1, &vertexView);
+		cmd->IASetVertexBuffers(0, 1, &test.vertexView);
 		// TODO: Part 1b
 		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cmd->DrawInstanced(3, 1, 0, 0);
