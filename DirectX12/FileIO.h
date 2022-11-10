@@ -8,6 +8,7 @@ struct FileData
 	std::string type;
 	std::string name;
 	GW::MATH::GMATRIXF pos;
+	int baseModelIndex = 0;
 };
 
 class FileIO
@@ -117,16 +118,18 @@ public:
 				if (nameList[z].compare(objectName) == 0)
 				{
 					repeat = true;
+					gameLevelObjects[i].baseModelIndex = z;
 					break;
 				}
 			}
 			if (!repeat)
 			{
 				nameList.push_back(objectName);
-				objectName.insert(0, "../" + h2BLocationFolder +"/");
+				objectName.insert(0, "../" + h2BLocationFolder + "/");
 				objectName.append(".h2b");
 				h2bFileName = &objectName[0];
 				parser.Parse(h2bFileName);
+				gameLevelObjects[i].baseModelIndex = meshData.size();
 				meshData.push_back(parser);
 			}
 		}

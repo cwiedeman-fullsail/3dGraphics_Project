@@ -68,26 +68,27 @@ private:
 public:
 	Model();
 	~Model();
-	string									modelName;
-	vector<Vertex>							vertList;
-	unsigned								vCount = 0;
-	vector<unsigned>						indexList;
-	unsigned								iCount = 0;
-	unsigned								meshCount = 0;
-	unsigned								matCount = 0;
+	string											modelName;
+	vector<Vertex>									vertList;
+	unsigned										vCount = 0;
+	vector<unsigned>								indexList;
+	unsigned										iCount = 0;
+	unsigned										meshCount = 0;
+	unsigned										matCount = 0;
+	unsigned										baseIndex = 0;
 
-	GW::MATH::GMATRIXF						objectWorldM;
-	vector<Material_Attributes>				materials;
-	vector<Meshes>							objects;
-	vector<MESH_DATA>						MeshDataList;
+	GW::MATH::GMATRIXF								objectWorldM;
+	vector<Material_Attributes>						materials;
+	vector<Meshes>									objects;
+	vector<MESH_DATA>								MeshDataList;
 
-	D3D12_VERTEX_BUFFER_VIEW				vertexView;
-	Microsoft::WRL::ComPtr<ID3D12Resource>	vertexBuffer;
-	D3D12_INDEX_BUFFER_VIEW					indexView;
-	Microsoft::WRL::ComPtr<ID3D12Resource>	indexBuffer;
-	Microsoft::WRL::ComPtr<ID3D12Resource>	constantBuffer;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dHeap;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
+	D3D12_VERTEX_BUFFER_VIEW						vertexView;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			vertexBuffer;
+	D3D12_INDEX_BUFFER_VIEW							indexView;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			indexBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			constantBuffer;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	dHeap;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE					cpuHandle;
 
 	void addToVertList(Vertex V)
 	{

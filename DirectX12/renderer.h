@@ -26,7 +26,7 @@ FileIO files;
 // Creation, Rendering & Cleanup
 class Renderer
 {
-	string gameLevelPath = "../Test/GameLevel.txt";
+	string gameLevelPath = "../Test/GameLevelTest2.txt";
 
 	// proxy handles
 	GW::SYSTEM::GWindow win;
@@ -246,17 +246,18 @@ public:
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 		// now we can draw
-		for (size_t i = 0; i < objectList.size(); i++)
+		for (size_t i = 0; i < files.gameLevelObjects.size(); i++)
 		{
-			cmd->SetDescriptorHeaps(1, objectList[i].dHeap.GetAddressOf());
-			cmd->SetGraphicsRootConstantBufferView(0, objectList[i].constantBuffer->GetGPUVirtualAddress());
-			cmd->IASetVertexBuffers(0, 1, &objectList[i].vertexView);
-			cmd->IASetIndexBuffer(&objectList[i].indexView);
+
+			cmd->SetDescriptorHeaps(1, objectList[files.gameLevelObjects[i].baseModelIndex].dHeap.GetAddressOf());
+			cmd->SetGraphicsRootConstantBufferView(0, objectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress());
+			cmd->IASetVertexBuffers(0, 1, &objectList[files.gameLevelObjects[i].baseModelIndex].vertexView);
+			cmd->IASetIndexBuffer(&objectList[files.gameLevelObjects[i].baseModelIndex].indexView);
 			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			for (size_t j = 0; j < objectList[i].meshCount; j++)
+			for (size_t j = 0; j < objectList[files.gameLevelObjects[i].baseModelIndex].meshCount; j++)
 			{
-				cmd->SetGraphicsRootConstantBufferView(1, objectList[i].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
-				cmd->DrawIndexedInstanced(objectList[i].objects[j].indexCount, 1, objectList[i].objects[j].indexOffset, 0, 0);
+				cmd->SetGraphicsRootConstantBufferView(1, objectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
+				cmd->DrawIndexedInstanced(objectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexCount, 1, objectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexOffset, 0, 0);
 			}
 		}
 		// release temp handles
