@@ -26,6 +26,7 @@ add_executable (Level_Project
 	renderer.h
 	Model.h
 	FileIO.h
+	h2bParser.h
 	${VERTEX_SHADERS}
 	${PIXEL_SHADERS}
 )

@@ -18,7 +18,7 @@ public:
 	~FileIO();
 	std::vector<FileData> gameLevelObjects;
 	std::vector<H2B::Parser> meshData;
-	std::vector<std::string> nameList;
+	//std::vector<std::string> nameList;
 	H2B::Parser parser;
 	string h2BLocationFolder;
 
@@ -98,7 +98,6 @@ public:
 			char* h2bFileName;
 			int count = 0;
 			std::string objectName(gameLevelObjects[i].name);
-			char* trimmedName;
 			for (size_t j = 0; j < objectName.length(); j++)
 			{
 				if (objectName[j] == '.')
@@ -112,7 +111,7 @@ public:
 				}
 				count++;
 			}
-			bool repeat = false;
+			/*bool repeat = false;
 			for (size_t z = 0; z < nameList.size(); z++)
 			{
 				if (nameList[z].compare(objectName) == 0)
@@ -121,17 +120,17 @@ public:
 					gameLevelObjects[i].baseModelIndex = z;
 					break;
 				}
-			}
-			if (!repeat)
-			{
-				nameList.push_back(objectName);
-				objectName.insert(0, "../" + h2BLocationFolder + "/");
-				objectName.append(".h2b");
-				h2bFileName = &objectName[0];
-				parser.Parse(h2bFileName);
-				gameLevelObjects[i].baseModelIndex = meshData.size();
-				meshData.push_back(parser);
-			}
+			}*/
+			/*if (!repeat)
+			{*/
+			//nameList.push_back(objectName);
+			objectName.insert(0, "../" + h2BLocationFolder + "/");
+			objectName.append(".h2b");
+			h2bFileName = &objectName[0];
+			parser.Parse(h2bFileName);
+			gameLevelObjects[i].baseModelIndex = meshData.size();
+			meshData.push_back(parser);
+			//}
 		}
 	}
 };

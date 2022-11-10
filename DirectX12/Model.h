@@ -75,11 +75,12 @@ public:
 	unsigned										iCount = 0;
 	unsigned										meshCount = 0;
 	unsigned										matCount = 0;
-	unsigned										baseIndex = 0;
+	GW::MATH::GMATRIXF								positionMatrix;
 
 	vector<Material_Attributes>						materials;
 	vector<Meshes>									objects;
 	vector<MESH_DATA>								MeshDataList;
+	SCENE_DATA										CamandLight;
 
 	D3D12_VERTEX_BUFFER_VIEW						vertexView;
 	Microsoft::WRL::ComPtr<ID3D12Resource>			vertexBuffer;
@@ -177,13 +178,13 @@ public:
 			nullptr,
 			IID_PPV_ARGS(constantBuffer.GetAddressOf()));
 	}
-	void loadMaterialsToGPU(SCENE_DATA _camerAndLights, MESH_DATA* _mesh, int _matIndex)
+	void loadMaterialsToGPU(MESH_DATA* _mesh, int _matIndex)
 	{
 		UINT8* transferMemoryLocation;
 		constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 			reinterpret_cast<void**>(&transferMemoryLocation));
-		memcpy(transferMemoryLocation, &_camerAndLights, sizeof(SCENE_DATA));
-		memcpy(transferMemoryLocation + chunkSize, &_camerAndLights, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation, &CamandLight, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + chunkSize, &CamandLight, sizeof(SCENE_DATA));
 		memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
 		memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
 		constantBuffer->Unmap(0, nullptr);
