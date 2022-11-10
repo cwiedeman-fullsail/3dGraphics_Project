@@ -178,7 +178,7 @@ public:
 			nullptr,
 			IID_PPV_ARGS(constantBuffer.GetAddressOf()));
 	}
-	void loadMaterialsToGPU(SCENE_DATA _camerAndLights, MESH_DATA _mesh, int _matIndex)
+	void loadMaterialsToGPU(SCENE_DATA _camerAndLights, MESH_DATA* _mesh, int _matIndex)
 	{
 		UINT8* transferMemoryLocation;
 		constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),

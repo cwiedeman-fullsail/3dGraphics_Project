@@ -19,7 +19,7 @@ std::string ShaderAsString(const char* shaderFilePath) {
 	return output;
 }
 
-vector<Model> objectList;
+vector<Model> UniqueObjectList;
 GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
 FileIO files;
 
@@ -55,12 +55,10 @@ public:
 
 		//Create Matrixes
 		//view
-		GW::MATH::GVECTORF eye = { 0.75f, 0.25f, -1.5f };
+		GW::MATH::GVECTORF eye = { 5.75f, 5.25f, -10.5f };
 		GW::MATH::GVECTORF at = { 0 };
 		GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
 		Math.LookAtLHF(eye, at, up, viewM);
-
-		Math.ScaleGlobalF(worldM, GW::MATH::GVECTORF{ 0.5f,0.5f,0.5f }, worldM);
 
 		//projection
 		UINT width;
@@ -126,9 +124,9 @@ public:
 				MESH_DATA mesh;
 				mesh.worldMatrix = worldM;
 				mesh.material = M.materials[j];
-				M.MeshDataList.push_back(mesh);
 				M.objects[i].materialIndex = j;
-				M.loadMaterialsToGPU(camerAndLights, mesh, j);
+				M.MeshDataList.push_back(mesh);
+				M.loadMaterialsToGPU(camerAndLights, &M.MeshDataList[j], j);
 				M.createDescriptorHeap(creator);
 				M.createCBView();
 			}
@@ -155,7 +153,7 @@ public:
 			}
 			M.createIndexBuffer(creator);
 
-			objectList.push_back(M);
+			UniqueObjectList.push_back(M);
 		}
 
 		// Create Vertex Shader
@@ -248,16 +246,28 @@ public:
 		// now we can draw
 		for (size_t i = 0; i < files.gameLevelObjects.size(); i++)
 		{
-
-			cmd->SetDescriptorHeaps(1, objectList[files.gameLevelObjects[i].baseModelIndex].dHeap.GetAddressOf());
-			cmd->SetGraphicsRootConstantBufferView(0, objectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress());
-			cmd->IASetVertexBuffers(0, 1, &objectList[files.gameLevelObjects[i].baseModelIndex].vertexView);
-			cmd->IASetIndexBuffer(&objectList[files.gameLevelObjects[i].baseModelIndex].indexView);
+			cmd->SetDescriptorHeaps(1, UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].dHeap.GetAddressOf());
+			cmd->SetGraphicsRootConstantBufferView(0, UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress());
+			cmd->IASetVertexBuffers(0, 1, &UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].vertexView);
+			cmd->IASetIndexBuffer(&UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].indexView);
 			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			for (size_t j = 0; j < objectList[files.gameLevelObjects[i].baseModelIndex].meshCount; j++)
+			for (size_t j = 0; j < UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].meshCount; j++)
 			{
-				cmd->SetGraphicsRootConstantBufferView(1, objectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
-				cmd->DrawIndexedInstanced(objectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexCount, 1, objectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexOffset, 0, 0);
+				//Update World Matrix for each mesh
+				UINT8* transferMemoryLocation;
+				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].objectWorldM = files.gameLevelObjects[i].pos;
+				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+					reinterpret_cast<void**>(&transferMemoryLocation));
+				memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j),
+					&UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].MeshDataList[j], sizeof(MESH_DATA));
+				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->Unmap(0, nullptr);
+
+
+				cmd->SetGraphicsRootConstantBufferView(1, 
+					UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress() +
+					sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
+				cmd->DrawIndexedInstanced(UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexCount, 1,
+					UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].objects[j].indexOffset, 0, 0);
 			}
 		}
 		// release temp handles

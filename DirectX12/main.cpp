@@ -25,11 +25,11 @@ int main()
 	if (+win.Create(0, 0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
 	{
 		// TODO: Part 1a
-		float clr[] = { 0, 168/255.0f, 107/255.0f, 1 }; // start with a jade color
+		float clr[] = { 0, 0, 0, 1 }; // start with a jade color
 		msgs.Create([&](const GW::GEvent& e) {
 			GW::SYSTEM::GWindow::Events q;
-			if (+e.Read(q) && q == GWindow::Events::RESIZE)
-				clr[0] += 0.01f; // move towards a orange as they resize
+			//if (+e.Read(q) && q == GWindow::Events::RESIZE)
+			//	clr[0] += 0.01f; // move towards a orange as they resize
 		});
 		win.Register(msgs);
 		if (+d3d12.Create(win, GW::GRAPHICS::DEPTH_BUFFER_SUPPORT))
