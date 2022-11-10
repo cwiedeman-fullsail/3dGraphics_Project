@@ -64,6 +64,7 @@ class Model
 {
 private:
 	UINT64 cbSize;
+	UINT chunkSize;
 public:
 	Model();
 	~Model();
@@ -164,11 +165,10 @@ public:
 		indexView.SizeInBytes = sizeof(float) * indexList.size();
 	}
 
-	void createConstantBuffer(ID3D12Device* _creator, int _matCount, SCENE_DATA _camerAndLights, MESH_DATA _mesh, int _frames)
+	void createConstantBuffer(ID3D12Device* _creator, int _frames)
 	{
-		cbSize = ((sizeof(SCENE_DATA) + 2) * sizeof(MESH_DATA)) * _frames;
-		UINT chunkSize = sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matCount);
-		UINT8* transferMemoryLocation;
+		cbSize = (sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * matCount)) * _frames;
+		chunkSize = sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * matCount);
 		_creator->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
@@ -176,17 +176,18 @@ public:
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(constantBuffer.GetAddressOf()));
+	}
+	void loadMaterialsToGPU(SCENE_DATA _camerAndLights, MESH_DATA _mesh, int _matIndex)
+	{
+		UINT8* transferMemoryLocation;
 		constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 			reinterpret_cast<void**>(&transferMemoryLocation));
 		memcpy(transferMemoryLocation, &_camerAndLights, sizeof(SCENE_DATA));
 		memcpy(transferMemoryLocation + chunkSize, &_camerAndLights, sizeof(SCENE_DATA));
-		for (size_t i = 0; i < matCount; i++)
-		{
-			memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i), &_mesh, sizeof(MESH_DATA));
-
-			memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i), &_mesh, sizeof(MESH_DATA));
-		}
+		memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
+		memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
 		constantBuffer->Unmap(0, nullptr);
+
 	}
 
 	void createDescriptorHeap(ID3D12Device* _creator)

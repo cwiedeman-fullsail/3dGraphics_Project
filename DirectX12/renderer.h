@@ -108,6 +108,7 @@ public:
 			M.iCount = files.meshData[i].indexCount;
 			M.matCount = files.meshData[i].materialCount;
 			M.meshCount = files.meshData[i].meshCount;
+			M.createConstantBuffer(creator, frames);
 			for (size_t j = 0; j < files.meshData[i].materialCount; j++)
 			{
 				M.buildMateralAttributeList(
@@ -126,7 +127,8 @@ public:
 				mesh.worldMatrix = worldM;
 				mesh.material = M.materials[j];
 				M.MeshDataList.push_back(mesh);
-				M.createConstantBuffer(creator, files.meshData[i].materialCount, camerAndLights, mesh, frames);
+				M.objects[i].materialIndex = j;
+				M.loadMaterialsToGPU(camerAndLights, mesh, j);
 				M.createDescriptorHeap(creator);
 				M.createCBView();
 			}
@@ -253,7 +255,7 @@ public:
 			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			for (size_t j = 0; j < objectList[i].meshCount; j++)
 			{
-				cmd->SetGraphicsRootConstantBufferView(1, objectList[i].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i));
+				cmd->SetGraphicsRootConstantBufferView(1, objectList[i].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
 				cmd->DrawIndexedInstanced(objectList[i].objects[j].indexCount, 1, objectList[i].objects[j].indexOffset, 0, 0);
 			}
 		}
