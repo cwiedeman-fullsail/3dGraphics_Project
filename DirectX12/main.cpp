@@ -2,6 +2,7 @@
 #define GATEWARE_ENABLE_CORE // All libraries need this
 #define GATEWARE_ENABLE_SYSTEM // Graphics libs require system level libraries
 #define GATEWARE_ENABLE_GRAPHICS // Enables all Graphics Libraries
+#define GATEWARE_ENABLE_MATH
 // Ignore some GRAPHICS libraries we aren't going to use
 #define GATEWARE_DISABLE_GDIRECTX11SURFACE // we have another template for this
 #define GATEWARE_DISABLE_GOPENGLSURFACE // we have another template for this
@@ -33,6 +34,7 @@ int main()
 		win.Register(msgs);
 		if (+d3d12.Create(win, GW::GRAPHICS::DEPTH_BUFFER_SUPPORT))
 		{
+			win.SetWindowName("Christopher Wiedeman - Level Renderer - D3D12");
 			Renderer renderer(win, d3d12); // init
 			while (+win.ProcessWindowEvents())
 			{

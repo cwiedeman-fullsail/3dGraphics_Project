@@ -10,11 +10,15 @@ struct VEC3
 {
 	float x, y, z;
 };
+struct VEC4
+{
+	float x, y, z, w;
+};
 
 struct Vertex
 {
-	VEC3									pos;
-	VEC3									uvw;
+	VEC4									pos;
+	VEC4									uvw;
 	VEC3									nrm;
 };
 
@@ -32,34 +36,62 @@ struct Material_Attributes
 	unsigned								illum;
 };
 
+
 struct Meshes
 {
 	string									name;
-	unsigned								indexCount;
-	unsigned								indexOffset;
-	unsigned								materialIndex;
+	unsigned								indexCount = 0;
+	unsigned								indexOffset = 0;
+	unsigned								materialIndex = 0;
+};
+
+struct SCENE_DATA
+{
+	GW::MATH::GVECTORF sunDirection, sunColor;
+	GW::MATH::GMATRIXF viewMatrix, projectionMatrix;
+	GW::MATH::GVECTORF sumAmb, camPOS;
+	GW::MATH::GVECTORF padding[4];
+};
+
+struct MESH_DATA
+{
+	GW::MATH::GMATRIXF worldMatrix;
+	Material_Attributes material;
+	unsigned padding[28];
 };
 
 class Model
 {
+private:
+	UINT64 cbSize;
 public:
 	Model();
 	~Model();
 	string									modelName;
 	vector<Vertex>							vertList;
 	unsigned								vCount = 0;
-	vector<float>							indexList;
+	vector<unsigned>						indexList;
 	unsigned								iCount = 0;
 	unsigned								meshCount = 0;
 	unsigned								matCount = 0;
-	vector<string>							matName;
+
+	GW::MATH::GMATRIXF						objectWorldM;
 	vector<Material_Attributes>				materials;
 	vector<Meshes>							objects;
+	vector<MESH_DATA>						MeshDataList;
+
 	D3D12_VERTEX_BUFFER_VIEW				vertexView;
 	Microsoft::WRL::ComPtr<ID3D12Resource>	vertexBuffer;
+	D3D12_INDEX_BUFFER_VIEW					indexView;
+	Microsoft::WRL::ComPtr<ID3D12Resource>	indexBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource>	constantBuffer;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dHeap;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 
 	void addToVertList(Vertex V)
 	{
+		V.pos.w = 1;
+		V.uvw.w = 1;
 		vertList.push_back(V);
 	}
 	void addToIndexList(float I)
@@ -89,10 +121,9 @@ public:
 	{
 		objects.push_back(mesh);
 	}
-	void buildMeshList(string _name, unsigned _indexCount, unsigned _indexOffset, unsigned _matIndex)
+	void buildMeshList(unsigned _indexCount, unsigned _indexOffset, unsigned _matIndex)
 	{
 		Meshes mesh;
-		mesh.name = _name;
 		mesh.indexCount = _indexCount;
 		mesh.indexOffset = _indexOffset;
 		mesh.materialIndex = _matIndex;
@@ -116,11 +147,73 @@ public:
 		vertexView.StrideInBytes = sizeof(Vertex);
 		vertexView.SizeInBytes = sizeof(Vertex) * vertList.size();
 	}
+
+	void createIndexBuffer(ID3D12Device* _creator)
+	{
+		_creator->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * indexList.size()),
+			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer));
+		UINT8* transferMemoryLocation;
+		indexBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+			reinterpret_cast<void**>(&transferMemoryLocation));
+		memcpy(transferMemoryLocation, indexList.data(), sizeof(float) * indexList.size());
+		indexBuffer->Unmap(0, nullptr);
+		indexView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
+		indexView.Format = DXGI_FORMAT_R32_UINT;
+		indexView.SizeInBytes = sizeof(float) * indexList.size();
+	}
+
+	void createConstantBuffer(ID3D12Device* _creator, int _matCount, SCENE_DATA _camerAndLights, MESH_DATA _mesh, int _frames)
+	{
+		cbSize = ((sizeof(SCENE_DATA) + 2) * sizeof(MESH_DATA)) * _frames;
+		UINT chunkSize = sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matCount);
+		UINT8* transferMemoryLocation;
+		_creator->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(cbSize),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(constantBuffer.GetAddressOf()));
+		constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+			reinterpret_cast<void**>(&transferMemoryLocation));
+		memcpy(transferMemoryLocation, &_camerAndLights, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + chunkSize, &_camerAndLights, sizeof(SCENE_DATA));
+		for (size_t i = 0; i < matCount; i++)
+		{
+			memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i), &_mesh, sizeof(MESH_DATA));
+
+			memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i), &_mesh, sizeof(MESH_DATA));
+		}
+		constantBuffer->Unmap(0, nullptr);
+	}
+
+	void createDescriptorHeap(ID3D12Device* _creator)
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+		heapDesc.NumDescriptors = 1;
+		heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		_creator->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&dHeap));
+	}
+
+	void createCBView()
+	{
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = constantBuffer->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = cbSize;
+	}
+
+	void createCPUHandle()
+	{
+		cpuHandle = dHeap->GetCPUDescriptorHandleForHeapStart();
+	}
 };
 
 Model::Model()
 {
-	
+
 }
 
 Model::~Model()

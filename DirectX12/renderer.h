@@ -1,6 +1,8 @@
 // minimalistic code to draw a single triangle, this is not part of the API.
 // required for compiling shaders on the fly, consider pre-compiling instead
 #include "Model.h";
+#include "FileIO.h"
+
 
 
 std::string ShaderAsString(const char* shaderFilePath) {
@@ -16,30 +18,144 @@ std::string ShaderAsString(const char* shaderFilePath) {
 		std::cout << "ERROR: Shader Source File \"" << shaderFilePath << "\" Not Found!" << std::endl;
 	return output;
 }
-Model test;
+
+vector<Model> objectList;
+GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
+FileIO files;
+
 // Creation, Rendering & Cleanup
 class Renderer
 {
+	string gameLevelPath = "../Test/GameLevel.txt";
+
 	// proxy handles
 	GW::SYSTEM::GWindow win;
 	GW::GRAPHICS::GDirectX12Surface d3d;
+	GW::MATH::GMatrix Math;
+
 	// what we need at a minimum to draw a triangle
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>	pipeline;
+
+	//Matrixes
+	GW::MATH::GMATRIXF viewM = GW::MATH::GIdentityMatrixF;
+	GW::MATH::GMATRIXF projM = GW::MATH::GIdentityMatrixF;
+	//directional light
+	GW::MATH::GVECTORF light_direction = { -1.0f, -1.0f, 2.0f };
+	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
+
 public:
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
+		Math.Create();
 		win = _win;
 		d3d = _d3d;
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 
-		// Create Vertex Buffer
-		test.addToVertList(Vertex({ 0.0f,0.5f,0.0f }));
-		test.addToVertList(Vertex({ 0.5f,-0.5f,0.0f }));
-		test.addToVertList(Vertex({ -0.5f,-0.5f,0.0f }));
-		
-		test.createVertexBuffer(creator);
+		//Create Matrixes
+		//view
+		GW::MATH::GVECTORF eye = { 0.75f, 0.25f, -1.5f };
+		GW::MATH::GVECTORF at = { 0 };
+		GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
+		Math.LookAtLHF(eye, at, up, viewM);
+
+		Math.ScaleGlobalF(worldM, GW::MATH::GVECTORF{ 0.5f,0.5f,0.5f }, worldM);
+
+		//projection
+		UINT width;
+		UINT height;
+		float aspect;
+		win.GetWidth(width);
+		win.GetHeight(height);
+		aspect = (float)width / (float)height;
+		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 100, projM);
+
+		SCENE_DATA camerAndLights;
+		GW::MATH::GVector::NormalizeF(light_direction, camerAndLights.sunDirection);
+		camerAndLights.sunColor = light_color;
+		camerAndLights.viewMatrix = viewM;
+		camerAndLights.projectionMatrix = projM;
+		camerAndLights.sumAmb = { 0.25f, 0.25f, 0.35f, 1 };
+
+		//caculate Camera Position
+		GW::MATH::GMATRIXF temp;
+		Math.InverseF(viewM, temp);
+		GW::MATH::GVECTORF temp2;
+		Math.GetTranslationF(temp, temp2);
+		camerAndLights.camPOS = temp2;
+
+		DXGI_SWAP_CHAIN_DESC sw_desc;
+		Microsoft::WRL::ComPtr <IDXGISwapChain4> test = nullptr;
+		d3d.GetSwapchain4((void**)&test);
+		test->GetDesc(&sw_desc);
+		int frames = sw_desc.BufferCount;
+
+
+
+		//set h2b files read folder
+		files.h2BLocationFolder = "Test";
+
+		//read files
+		files.ReadFile(gameLevelPath);
+		files.ReadH2B();
+
+		for (size_t i = 0; i < files.meshData.size(); i++)
+		{
+			Model M;
+			M.modelName = files.nameList[i];
+			M.vCount = files.meshData[i].vertexCount;
+			M.iCount = files.meshData[i].indexCount;
+			M.matCount = files.meshData[i].materialCount;
+			M.meshCount = files.meshData[i].meshCount;
+			for (size_t j = 0; j < files.meshData[i].materialCount; j++)
+			{
+				M.buildMateralAttributeList(
+					VEC3{ files.meshData[i].materials[j].attrib.Kd.x, files.meshData[i].materials[j].attrib.Kd.y,files.meshData[i].materials[j].attrib.Kd.z },
+					files.meshData[i].materials[j].attrib.d,
+					VEC3{ files.meshData[i].materials[j].attrib.Ks.x,files.meshData[i].materials[j].attrib.Ks.y,files.meshData[i].materials[j].attrib.Ks.z },
+					files.meshData[i].materials[j].attrib.Ns,
+					VEC3{ files.meshData[i].materials[j].attrib.Ka.x,files.meshData[i].materials[j].attrib.Ka.y,files.meshData[i].materials[j].attrib.Ka.z },
+					files.meshData[i].materials[j].attrib.sharpness,
+					VEC3{ files.meshData[i].materials[j].attrib.Tf.x, files.meshData[i].materials[j].attrib.Tf.y, files.meshData[i].materials[j].attrib.Tf.z },
+					files.meshData[i].materials[j].attrib.Ni,
+					VEC3{ files.meshData[i].materials[j].attrib.Ke.x, files.meshData[i].materials[j].attrib.Ke.y,files.meshData[i].materials[j].attrib.Ke.z },
+					files.meshData[i].materials[j].attrib.illum);
+				M.buildMeshList(files.meshData[i].meshes[j].drawInfo.indexCount, files.meshData[i].meshes[j].drawInfo.indexOffset, files.meshData[i].meshes[j].materialIndex);
+				MESH_DATA mesh;
+				mesh.worldMatrix = worldM;
+				mesh.material = M.materials[j];
+				M.MeshDataList.push_back(mesh);
+				M.createConstantBuffer(creator, files.meshData[i].materialCount, camerAndLights, mesh, frames);
+				M.createDescriptorHeap(creator);
+				M.createCBView();
+			}
+
+			// Create Vertex Buffer
+			for (size_t j = 0; j < files.meshData[i].vertices.size(); j++)
+			{
+				Vertex v;
+				v.pos.x = files.meshData[i].vertices[j].pos.x;
+				v.pos.y = files.meshData[i].vertices[j].pos.y;
+				v.pos.z = files.meshData[i].vertices[j].pos.z;
+				v.uvw.x = files.meshData[i].vertices[j].uvw.x;
+				v.uvw.y = files.meshData[i].vertices[j].uvw.y;
+				v.uvw.z = files.meshData[i].vertices[j].uvw.z;
+				v.nrm.x = files.meshData[i].vertices[j].nrm.x;
+				v.nrm.y = files.meshData[i].vertices[j].nrm.y;
+				v.nrm.z = files.meshData[i].vertices[j].nrm.z;
+				M.addToVertList(v);
+			}
+			M.createVertexBuffer(creator);
+			for (size_t j = 0; j < files.meshData[i].indices.size(); j++)
+			{
+				M.addToIndexList(files.meshData[i].indices[j]);
+			}
+			M.createIndexBuffer(creator);
+
+			objectList.push_back(M);
+		}
+
 		// Create Vertex Shader
 		UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG
@@ -55,8 +171,6 @@ public:
 			abort();
 		}
 
-
-
 		// Create Pixel Shader
 		Microsoft::WRL::ComPtr<ID3DBlob> psBlob; errors.Reset();
 		std::string pShade = ShaderAsString("../pShader.hlsl");
@@ -68,27 +182,25 @@ public:
 			abort();
 		}
 
-
-
 		// Create Input Layout
-		D3D12_INPUT_ELEMENT_DESC format[] = 
+		D3D12_INPUT_ELEMENT_DESC format[] =
 		{
-			{
-				"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-			},
-			{
-				"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-			},
-			{
-				"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-			}
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
 		};
 
+		CD3DX12_ROOT_PARAMETER root1;
+		CD3DX12_ROOT_PARAMETER root2;
 
+		root1.InitAsConstantBufferView(0, 0);
+		root2.InitAsConstantBufferView(1, 0);
+
+		CD3DX12_ROOT_PARAMETER rArr[2] = { root1,root2 };
 
 		// create root signature
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr,
+		rootSignatureDesc.Init(2, rArr, 0, nullptr,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		Microsoft::WRL::ComPtr<ID3DBlob> signature;
 		D3D12SerializeRootSignature(&rootSignatureDesc,
@@ -132,10 +244,19 @@ public:
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 		// now we can draw
-		cmd->IASetVertexBuffers(0, 1, &test.vertexView);
-		// TODO: Part 1b
-		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cmd->DrawInstanced(3, 1, 0, 0);
+		for (size_t i = 0; i < objectList.size(); i++)
+		{
+			cmd->SetDescriptorHeaps(1, objectList[i].dHeap.GetAddressOf());
+			cmd->SetGraphicsRootConstantBufferView(0, objectList[i].constantBuffer->GetGPUVirtualAddress());
+			cmd->IASetVertexBuffers(0, 1, &objectList[i].vertexView);
+			cmd->IASetIndexBuffer(&objectList[i].indexView);
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			for (size_t j = 0; j < objectList[i].meshCount; j++)
+			{
+				cmd->SetGraphicsRootConstantBufferView(1, objectList[i].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * i));
+				cmd->DrawIndexedInstanced(objectList[i].objects[j].indexCount, 1, objectList[i].objects[j].indexOffset, 0, 0);
+			}
+		}
 		// release temp handles
 		cmd->Release();
 	}
