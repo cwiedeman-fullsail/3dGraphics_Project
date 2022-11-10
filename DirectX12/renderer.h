@@ -255,14 +255,14 @@ public:
 			{
 				//Update World Matrix for each mesh
 				UINT8* transferMemoryLocation;
-				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].objectWorldM = files.gameLevelObjects[i].pos;
+				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].MeshDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
 				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 					reinterpret_cast<void**>(&transferMemoryLocation));
+
 				memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j),
 					&UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].MeshDataList[j], sizeof(MESH_DATA));
+
 				UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->Unmap(0, nullptr);
-
-
 				cmd->SetGraphicsRootConstantBufferView(1, 
 					UniqueObjectList[files.gameLevelObjects[i].baseModelIndex].constantBuffer->GetGPUVirtualAddress() +
 					sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));

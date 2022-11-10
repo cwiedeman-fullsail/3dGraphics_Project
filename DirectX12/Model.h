@@ -77,7 +77,6 @@ public:
 	unsigned										matCount = 0;
 	unsigned										baseIndex = 0;
 
-	GW::MATH::GMATRIXF								objectWorldM;
 	vector<Material_Attributes>						materials;
 	vector<Meshes>									objects;
 	vector<MESH_DATA>								MeshDataList;
