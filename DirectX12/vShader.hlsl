@@ -60,7 +60,7 @@ OUT_TO_RASTERIZER main(inVertex inputVertex)
     output.posH = mul(inputVertex.pos, meshInfo.worldMatrix);
     output.posH = mul(output.posH, cameraAndLights.viewMatrix);
     output.posH = mul(output.posH, cameraAndLights.projectionMatrix);
-    output.nrmW = mul(float4(inputVertex.nrm, 1), meshInfo.worldMatrix);
+    output.nrmW = mul(float4(inputVertex.nrm, 0), meshInfo.worldMatrix);
     output.posW = mul(inputVertex.pos, meshInfo.worldMatrix);
     output.uvw = inputVertex.uvw;
     return output;

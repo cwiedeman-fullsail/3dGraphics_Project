@@ -25,7 +25,7 @@ SCENE_DATA camerAndLights;
 // Creation, Rendering & Cleanup
 class Renderer
 {
-	string gameLevelPath = "../Test/GameLevelTest4.txt";
+	string gameLevelPath = "../Test/GameLevelTest5.txt";
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
 
@@ -114,12 +114,12 @@ public:
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
 		if (RollLeft > 0)
 		{
-			rotateZ = -(speed * duration) * 2;
+			rotateZ = -(speed * duration) / 2;
 			//std::cout << "Z Key: " << Zf << "\n";
 		};
 		if (RollRight > 0)
 		{
-			rotateZ = (speed * duration) * 2;
+			rotateZ = (speed * duration) / 2;
 			//std::cout << "C Key: " << Cf << "\n";
 		};
 		if (boost > 0)

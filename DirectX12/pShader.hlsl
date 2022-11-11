@@ -35,7 +35,7 @@ ConstantBuffer<MESH_DATA> meshInfo : register(b1, Space0);
 
 float4 main(float4 posH : SV_Position, float3 nrmW : NORMAL, float3 posW : WORLD) : SV_TARGET
 {
-    float lightRatio = saturate(dot(normalize(-cameraAndLights.sunDirection.xyz), normalize(nrmW)));
+    float lightRatio = saturate(dot(normalize(-cameraAndLights.sunDirection), normalize(float4(nrmW,0))));
     float4 indirect = cameraAndLights.sunAmb * cameraAndLights.sunColor * float4(meshInfo.material.Ka, 1);
     float4 direct = saturate(lightRatio + indirect) * float4(meshInfo.material.Kd, 1);
     
@@ -45,4 +45,5 @@ float4 main(float4 posH : SV_Position, float3 nrmW : NORMAL, float3 posW : WORLD
     float4 reflected = intensity * cameraAndLights.sunColor * float4(meshInfo.material.Ks, 1);
        
     return saturate(direct + reflected);
+    //return float4(0.5f, 0.5f, 0.5f, 1.0f);
 }
