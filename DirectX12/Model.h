@@ -69,6 +69,7 @@ public:
 	Model();
 	~Model();
 	string											modelName;
+	string											modelType;
 	vector<Vertex>									vertList;
 	unsigned										vCount = 0;
 	vector<unsigned>								indexList;

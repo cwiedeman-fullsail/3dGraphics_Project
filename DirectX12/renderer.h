@@ -4,7 +4,6 @@
 #include "FileIO.h"
 
 
-
 std::string ShaderAsString(const char* shaderFilePath) {
 	std::string output;
 	unsigned int stringLength = 0;
@@ -20,13 +19,15 @@ std::string ShaderAsString(const char* shaderFilePath) {
 }
 
 vector<Model> CompleteModelList;
-GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
 FileIO files;
+SCENE_DATA camerAndLights;
 
 // Creation, Rendering & Cleanup
 class Renderer
 {
 	string gameLevelPath = "../Test/GameLevelTest4.txt";
+	GW::INPUT::GInput KBM;
+	GW::INPUT::GController Control;
 
 	// proxy handles
 	GW::SYSTEM::GWindow win;
@@ -40,22 +41,184 @@ class Renderer
 	//Matrixes
 	GW::MATH::GMATRIXF viewM = GW::MATH::GIdentityMatrixF;
 	GW::MATH::GMATRIXF projM = GW::MATH::GIdentityMatrixF;
+	GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
 	//directional light
 	GW::MATH::GVECTORF light_direction = { -1.0f, -1.0f, 2.0f };
 	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
 
 public:
+	GW::MATH::GVECTORF eye = { .25f, -.125f, -0.75f, 1 };
+	GW::MATH::GVECTORF at = { 0,-0.5f,0, 1 };
+	GW::MATH::GVECTORF up = { 0,1,0, 1 };
+	GW::MATH::GVECTORF moveV;
+	GW::MATH::GMATRIXF rotationM;
+	float rotateX;
+	float rotateY;
+	float rotateZ;
+
+	float mouseX;
+	float mouseY;
+	float duration = 0;
+	float speed = 0;
+	float mSpeed = 500;
+	float defaultSpeed = 500;
+
+	void UpdateCamera()
+	{
+		KBM.Create(win);
+		Control.Create();
+		std::chrono::high_resolution_clock::time_point _end(std::chrono::high_resolution_clock::now());
+
+		moveV = { 0 };
+		rotationM = { 0 };
+		rotateX = 0;
+		rotateY = 0;
+		rotateZ = 0;
+		speed = defaultSpeed;
+		GW::MATH::GMATRIXF view_copy = camerAndLights.viewMatrix;
+		float RollLeft = 0;
+		float RollRight = 0;
+		float Up = 0;
+		float down = 0;
+		float left = 0;
+		float right = 0;
+		float forward = 0;
+		float backward = 0;
+		float boost = 0;
+		float leftClick = 0;
+
+		bool connected = false;
+		Control.IsConnected(0, connected);
+		if (connected)
+		{
+			Control.GetState(0, G_LEFT_SHOULDER_BTN, RollLeft);
+			Control.GetState(0, G_RIGHT_SHOULDER_BTN, RollRight);
+			Control.GetState(0, G_EAST_BTN, boost);
+			if (RollLeft > 0)
+			{
+				rotateZ = -(speed * duration);
+				//std::cout << "Z Key: " << Zf << "\n";
+			};
+			if (RollRight > 0)
+			{
+				rotateZ = (speed * duration);
+				//std::cout << "C Key: " << Cf << "\n";
+			};
+			if (boost > 0)
+			{
+				speed = 2000;
+			}
+		}
+		KBM.GetState(G_KEY_Q, RollLeft);
+		KBM.GetState(G_KEY_E, RollRight);
+		KBM.GetState(G_KEY_LEFTSHIFT, boost);
+		if (RollLeft > 0)
+		{
+			rotateZ = -(speed * duration) * 2;
+			//std::cout << "Z Key: " << Zf << "\n";
+		};
+		if (RollRight > 0)
+		{
+			rotateZ = (speed * duration) * 2;
+			//std::cout << "C Key: " << Cf << "\n";
+		};
+		if (boost > 0)
+		{
+			speed = 2000;
+		}
+		KBM.GetState(G_KEY_SPACE, Up);
+		KBM.GetState(G_KEY_LEFTCONTROL, down);
+		KBM.GetState(G_KEY_A, left);
+		KBM.GetState(G_KEY_D, right);
+		KBM.GetState(G_KEY_W, forward);
+		KBM.GetState(G_KEY_S, backward);
+		KBM.GetState(G_BUTTON_LEFT, leftClick);
+
+
+		if (backward > 0)
+		{
+			moveV.z = speed * duration;
+		};
+		if (forward > 0)
+		{
+			moveV.z = -speed * duration;
+		};
+		if (right > 0)
+		{
+			moveV.x = -speed * duration;
+		};
+		if (left > 0)
+		{
+			moveV.x = speed * duration;
+		};
+		if (down > 0)
+		{
+			moveV.y = speed * duration;
+		};
+		if (Up > 0)
+		{
+			moveV.y = -speed * duration;
+		};
+		GW::GReturn result;
+		result = KBM.GetMouseDelta(mouseX, mouseY);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && leftClick > 0)
+		{
+			//std::cout << mouseX << " " << mouseY << "\n";
+			rotateX = (-mouseX) * mSpeed * duration;
+			rotateY = (-mouseY) * mSpeed * duration;
+		};
+
+		result = Control.GetState(0, G_RX_AXIS, mouseX);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && (mouseX > 0.05f || mouseX < -0.05f))
+		{
+			rotateX = (-mouseX) * mSpeed * duration;
+		};
+		result = Control.GetState(0, G_RY_AXIS, mouseY);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && (mouseY > 0.05f || mouseY < -0.05f))
+		{
+			rotateY = (-mouseY) * mSpeed * duration;
+		};
+		result = Control.GetState(0, G_LY_AXIS, forward);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && (forward > 0.05f || forward < -0.05f))
+		{
+			moveV.z = (-speed * duration) * forward;
+		};
+		result = Control.GetState(0, G_LX_AXIS, left);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && (left > 0.05f || left < -0.05f))
+		{
+			moveV.x = (-speed * duration) * left;
+		};
+		result = Control.GetState(0, G_LEFT_TRIGGER_AXIS, down);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && down > 0.05f)
+		{
+			moveV.y = (speed * duration) * down;
+		};
+		result = Control.GetState(0, G_RIGHT_TRIGGER_AXIS, Up);
+		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && Up > 0.05f)
+		{
+			moveV.y = (-speed * duration) * Up;
+		};
+		Math.RotationYawPitchRollF(rotateX, rotateY, rotateZ, rotationM);
+		Math.TranslateGlobalF(view_copy, moveV, view_copy);
+		Math.MultiplyMatrixF(view_copy, rotationM, camerAndLights.viewMatrix);
+		std::chrono::high_resolution_clock::time_point _start(std::chrono::high_resolution_clock::now());
+		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_start - _end).count();
+		//std::cout << duration << '\n';
+	}
+
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
 		Math.Create();
+		KBM.Create(win);
 		win = _win;
 		d3d = _d3d;
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
+		KBM.Create(win);
 
 		//Create Matrixes
 		//view
-		GW::MATH::GVECTORF eye = { 5.0f, 5.0f, -5.0f };
+		GW::MATH::GVECTORF eye = { 20.0f, 20.0f, -20.0f };
 		GW::MATH::GVECTORF at = { 0 };
 		GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
 		Math.LookAtLHF(eye, at, up, viewM);
@@ -67,15 +230,14 @@ public:
 		win.GetWidth(width);
 		win.GetHeight(height);
 		aspect = (float)width / (float)height;
-		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 100, projM);
+		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 1000, projM);
 
 
-		SCENE_DATA camerAndLights;
 		GW::MATH::GVector::NormalizeF(light_direction, camerAndLights.sunDirection);
 		camerAndLights.sunColor = light_color;
 		camerAndLights.viewMatrix = viewM;
 		camerAndLights.projectionMatrix = projM;
-		camerAndLights.sumAmb = { 0.25f, 0.25f, 0.35f, 1 };
+		camerAndLights.sumAmb = { 0.25f, 0.25f, 0.35f, 1.0f };
 
 		//caculate Camera Position
 		GW::MATH::GMATRIXF temp;
@@ -103,6 +265,7 @@ public:
 		{
 			Model M;
 			M.modelName = files.gameLevelObjects[i].name;
+			M.modelType = files.gameLevelObjects[i].type;
 			M.positionMatrix = files.gameLevelObjects[i].pos;
 			M.vCount = files.meshData[i].vertexCount;
 			M.iCount = files.meshData[i].indexCount;
@@ -246,8 +409,12 @@ public:
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 		// now we can draw
-		for (size_t i = 0; i < files.gameLevelObjects.size(); i++)
+		for (size_t i = 0; i < CompleteModelList.size(); i++)
 		{
+			if (CompleteModelList[i].modelType != "MESH")
+			{
+				continue;
+			}
 			cmd->SetDescriptorHeaps(1, CompleteModelList[i].dHeap.GetAddressOf());
 			cmd->SetGraphicsRootConstantBufferView(0, CompleteModelList[i].constantBuffer->GetGPUVirtualAddress());
 			cmd->IASetVertexBuffers(0, 1, &CompleteModelList[i].vertexView);
@@ -260,12 +427,12 @@ public:
 				CompleteModelList[i].MeshDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
 				CompleteModelList[i].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 					reinterpret_cast<void**>(&transferMemoryLocation));
-				//memcpy(transferMemoryLocation, &CompleteModelList[i].CamandLight, sizeof(SCENE_DATA));
+				memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
 				memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j),
 					&CompleteModelList[i].MeshDataList[j], sizeof(MESH_DATA));
 				CompleteModelList[i].constantBuffer->Unmap(0, nullptr);
 
-				cmd->SetGraphicsRootConstantBufferView(1, 
+				cmd->SetGraphicsRootConstantBufferView(1,
 					CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() +
 					sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
 				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,

@@ -1,3 +1,4 @@
+#pragma pack_matrix(row_major)
 
 struct OBJ_ATTRIBUTES
 {
