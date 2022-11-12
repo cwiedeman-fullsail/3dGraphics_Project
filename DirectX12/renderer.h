@@ -25,7 +25,7 @@ SCENE_DATA camerAndLights;
 // Creation, Rendering & Cleanup
 class Renderer
 {
-	string gameLevelPath = "../Test/GameLevelTest5.txt";
+	string gameLevelPath = "../assets/GameLevel.txt";
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
 
@@ -47,9 +47,9 @@ class Renderer
 	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
 
 public:
-	GW::MATH::GVECTORF eye = { .25f, -.125f, -0.75f, 1 };
-	GW::MATH::GVECTORF at = { 0,-0.5f,0, 1 };
-	GW::MATH::GVECTORF up = { 0,1,0, 1 };
+	GW::MATH::GVECTORF eye = { 0 };
+	GW::MATH::GVECTORF at = { 0 };
+	GW::MATH::GVECTORF up = { 0 };
 	GW::MATH::GVECTORF moveV;
 	GW::MATH::GMATRIXF rotationM;
 	float rotateX;
@@ -218,7 +218,7 @@ public:
 
 		//Create Matrixes
 		//view
-		GW::MATH::GVECTORF eye = { 20.0f, 20.0f, -20.0f };
+		GW::MATH::GVECTORF eye = { 10.0f, 10.0f, -10.0f };
 		GW::MATH::GVECTORF at = { 0 };
 		GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
 		Math.LookAtLHF(eye, at, up, viewM);
@@ -234,6 +234,7 @@ public:
 
 
 		GW::MATH::GVector::NormalizeF(light_direction, camerAndLights.sunDirection);
+		//camerAndLights.sunDirection = light_direction;
 		camerAndLights.sunColor = light_color;
 		camerAndLights.viewMatrix = viewM;
 		camerAndLights.projectionMatrix = projM;
@@ -255,66 +256,69 @@ public:
 
 
 		//set h2b files read folder
-		files.h2BLocationFolder = "Test";
+		files.h2BLocationFolder = "assets";
 
 		//read files
 		files.ReadFile(gameLevelPath);
 		files.ReadH2B();
 
-		for (size_t i = 0; i < files.meshData.size(); i++)
+		for (size_t i = 0; i < files.meshAndMaterialData.size(); i++)
 		{
 			Model M;
 			M.modelName = files.gameLevelObjects[i].name;
 			M.modelType = files.gameLevelObjects[i].type;
-			M.positionMatrix = files.gameLevelObjects[i].pos;
-			M.vCount = files.meshData[i].vertexCount;
-			M.iCount = files.meshData[i].indexCount;
-			M.matCount = files.meshData[i].materialCount;
-			M.meshCount = files.meshData[i].meshCount;
+			M.vCount = files.meshAndMaterialData[i].vertexCount;
+			M.iCount = files.meshAndMaterialData[i].indexCount;
+			M.matCount = files.meshAndMaterialData[i].materialCount;
+			M.meshCount = files.meshAndMaterialData[i].meshCount;
 			M.createConstantBuffer(creator, frames);
-			for (size_t j = 0; j < files.meshData[i].materialCount; j++)
+			for (size_t j = 0; j < files.meshAndMaterialData[i].materialCount; j++)
 			{
 				M.buildMateralAttributeList(
-					VEC3{ files.meshData[i].materials[j].attrib.Kd.x, files.meshData[i].materials[j].attrib.Kd.y,files.meshData[i].materials[j].attrib.Kd.z },
-					files.meshData[i].materials[j].attrib.d,
-					VEC3{ files.meshData[i].materials[j].attrib.Ks.x,files.meshData[i].materials[j].attrib.Ks.y,files.meshData[i].materials[j].attrib.Ks.z },
-					files.meshData[i].materials[j].attrib.Ns,
-					VEC3{ files.meshData[i].materials[j].attrib.Ka.x,files.meshData[i].materials[j].attrib.Ka.y,files.meshData[i].materials[j].attrib.Ka.z },
-					files.meshData[i].materials[j].attrib.sharpness,
-					VEC3{ files.meshData[i].materials[j].attrib.Tf.x, files.meshData[i].materials[j].attrib.Tf.y, files.meshData[i].materials[j].attrib.Tf.z },
-					files.meshData[i].materials[j].attrib.Ni,
-					VEC3{ files.meshData[i].materials[j].attrib.Ke.x, files.meshData[i].materials[j].attrib.Ke.y,files.meshData[i].materials[j].attrib.Ke.z },
-					files.meshData[i].materials[j].attrib.illum);
-				M.buildMeshList(files.meshData[i].meshes[j].drawInfo.indexCount, files.meshData[i].meshes[j].drawInfo.indexOffset, files.meshData[i].meshes[j].materialIndex);
+					VEC3{ files.meshAndMaterialData[i].materials[j].attrib.Kd.x, files.meshAndMaterialData[i].materials[j].attrib.Kd.y,files.meshAndMaterialData[i].materials[j].attrib.Kd.z },
+					files.meshAndMaterialData[i].materials[j].attrib.d,
+					VEC3{ files.meshAndMaterialData[i].materials[j].attrib.Ks.x,files.meshAndMaterialData[i].materials[j].attrib.Ks.y,files.meshAndMaterialData[i].materials[j].attrib.Ks.z },
+					files.meshAndMaterialData[i].materials[j].attrib.Ns,
+					VEC3{ files.meshAndMaterialData[i].materials[j].attrib.Ka.x,files.meshAndMaterialData[i].materials[j].attrib.Ka.y,files.meshAndMaterialData[i].materials[j].attrib.Ka.z },
+					files.meshAndMaterialData[i].materials[j].attrib.sharpness,
+					VEC3{ files.meshAndMaterialData[i].materials[j].attrib.Tf.x, files.meshAndMaterialData[i].materials[j].attrib.Tf.y, files.meshAndMaterialData[i].materials[j].attrib.Tf.z },
+					files.meshAndMaterialData[i].materials[j].attrib.Ni,
+					VEC3{ files.meshAndMaterialData[i].materials[j].attrib.Ke.x, files.meshAndMaterialData[i].materials[j].attrib.Ke.y,files.meshAndMaterialData[i].materials[j].attrib.Ke.z },
+					files.meshAndMaterialData[i].materials[j].attrib.illum);
+				M.buildMeshList(files.meshAndMaterialData[i].meshes[j].drawInfo.indexCount, files.meshAndMaterialData[i].meshes[j].drawInfo.indexOffset);
 				M.CamandLight = camerAndLights;
 				MESH_DATA mesh;
 				mesh.worldMatrix = files.gameLevelObjects[i].pos;
 				mesh.material = M.materials[j];
-				M.MeshDataList.push_back(mesh);
-				M.loadMaterialsToGPU(&M.MeshDataList[j], j);
+				M.meshAndMaterialDataList.push_back(mesh);
+				M.loadMaterialsToGPU(&M.meshAndMaterialDataList[j], j);
 				M.createDescriptorHeap(creator);
 				M.createCBView();
 			}
 
 			// Create Vertex Buffer
-			for (size_t j = 0; j < files.meshData[i].vertices.size(); j++)
+			for (size_t j = 0; j < files.meshAndMaterialData[i].vertices.size(); j++)
 			{
 				Vertex v;
-				v.pos.x = files.meshData[i].vertices[j].pos.x;
-				v.pos.y = files.meshData[i].vertices[j].pos.y;
-				v.pos.z = files.meshData[i].vertices[j].pos.z;
-				v.uvw.x = files.meshData[i].vertices[j].uvw.x;
-				v.uvw.y = files.meshData[i].vertices[j].uvw.y;
-				v.uvw.z = files.meshData[i].vertices[j].uvw.z;
-				v.nrm.x = files.meshData[i].vertices[j].nrm.x;
-				v.nrm.y = files.meshData[i].vertices[j].nrm.y;
-				v.nrm.z = files.meshData[i].vertices[j].nrm.z;
+				v.pos.x = files.meshAndMaterialData[i].vertices[j].pos.x;
+				v.pos.y = files.meshAndMaterialData[i].vertices[j].pos.y;
+				v.pos.z = files.meshAndMaterialData[i].vertices[j].pos.z;
+				v.pos.w = 1;
+				v.uvw.x = files.meshAndMaterialData[i].vertices[j].uvw.x;
+				v.uvw.y = files.meshAndMaterialData[i].vertices[j].uvw.y;
+				v.uvw.z = files.meshAndMaterialData[i].vertices[j].uvw.z;
+				v.uvw.w = 1;
+				v.nrm.x = files.meshAndMaterialData[i].vertices[j].nrm.x;
+				v.nrm.y = files.meshAndMaterialData[i].vertices[j].nrm.y;
+				v.nrm.z = files.meshAndMaterialData[i].vertices[j].nrm.z;
 				M.addToVertList(v);
 			}
 			M.createVertexBuffer(creator);
-			for (size_t j = 0; j < files.meshData[i].indices.size(); j++)
+
+			//Create Index Buffer
+			for (size_t j = 0; j < files.meshAndMaterialData[i].indices.size(); j++)
 			{
-				M.addToIndexList(files.meshData[i].indices[j]);
+				M.addToIndexList(files.meshAndMaterialData[i].indices[j]);
 			}
 			M.createIndexBuffer(creator);
 
@@ -351,8 +355,8 @@ public:
 		D3D12_INPUT_ELEMENT_DESC format[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
+			{"TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
 		};
 
 		CD3DX12_ROOT_PARAMETER root1;
@@ -424,12 +428,12 @@ public:
 			{
 				//Update World Matrix for each mesh
 				UINT8* transferMemoryLocation;
-				CompleteModelList[i].MeshDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
+				CompleteModelList[i].meshAndMaterialDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
 				CompleteModelList[i].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 					reinterpret_cast<void**>(&transferMemoryLocation));
 				memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
 				memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j),
-					&CompleteModelList[i].MeshDataList[j], sizeof(MESH_DATA));
+					&CompleteModelList[i].meshAndMaterialDataList[j], sizeof(MESH_DATA));
 				CompleteModelList[i].constantBuffer->Unmap(0, nullptr);
 
 				cmd->SetGraphicsRootConstantBufferView(1,

@@ -36,19 +36,12 @@ struct inVertex
     float4 uvw : TEXCOORD;
     float3 nrm : NORMAL;
 };
-struct outVertex
-{
-    float4 pos : SV_POSITION;
-    float4 uvw : TEXCOORD;
-    float3 nrm : NORMAL;
-};
 struct OUT_TO_RASTERIZER
 {
     float4 posH : SV_Position;
     float3 nrmW : NORMAL;
     float3 posW : WORLD;
     float4 uvw : TEXCOORD;
-    //float4 camPOS :CAMERA;
 };
 
 ConstantBuffer<SCENE_DATA> cameraAndLights : register(b0, Space0);
@@ -62,6 +55,5 @@ OUT_TO_RASTERIZER main(inVertex inputVertex)
     output.posH = mul(output.posH, cameraAndLights.projectionMatrix);
     output.nrmW = mul(float4(inputVertex.nrm, 0), meshInfo.worldMatrix);
     output.posW = mul(inputVertex.pos, meshInfo.worldMatrix);
-    output.uvw = inputVertex.uvw;
     return output;
 }

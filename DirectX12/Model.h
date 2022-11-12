@@ -42,7 +42,6 @@ struct Meshes
 	string									name;
 	unsigned								indexCount = 0;
 	unsigned								indexOffset = 0;
-	unsigned								materialIndex = 0;
 };
 
 struct SCENE_DATA
@@ -76,11 +75,10 @@ public:
 	unsigned										iCount = 0;
 	unsigned										meshCount = 0;
 	unsigned										matCount = 0;
-	GW::MATH::GMATRIXF								positionMatrix;
 
 	vector<Material_Attributes>						materials;
 	vector<Meshes>									objects;
-	vector<MESH_DATA>								MeshDataList;
+	vector<MESH_DATA>								meshAndMaterialDataList;
 	SCENE_DATA										CamandLight;
 
 	D3D12_VERTEX_BUFFER_VIEW						vertexView;
@@ -124,12 +122,11 @@ public:
 	{
 		objects.push_back(mesh);
 	}
-	void buildMeshList(unsigned _indexCount, unsigned _indexOffset, unsigned _matIndex)
+	void buildMeshList(unsigned _indexCount, unsigned _indexOffset)
 	{
 		Meshes mesh;
 		mesh.indexCount = _indexCount;
 		mesh.indexOffset = _indexOffset;
-		mesh.materialIndex = _matIndex;
 		objects.push_back(mesh);
 	}
 
