@@ -39,13 +39,13 @@ float4 main(float4 posH : SV_Position, float3 nrmW : NORMAL, float3 posW : WORLD
     #if 1
     float lightRatio = saturate(dot(normalize(-cameraAndLights.sunDirection), normalize(float4(nrmW, 1))));
     float4 indirect = cameraAndLights.sunAmb * cameraAndLights.sunColor * float4(meshInfo.material.Ka, 1);
-    float4 direct = saturate(lightRatio/* + indirect*/) * float4(meshInfo.material.Kd, 0);
+    float4 direct = saturate(lightRatio + indirect) * float4(meshInfo.material.Kd, 0);
     
     float3 viewDir = normalize(cameraAndLights.camPOS.xyz - posW);
     float3 halfVector = normalize(-cameraAndLights.sunDirection.rgb + viewDir);
     float intensity = max(pow(saturate(dot(normalize(nrmW), halfVector)), meshInfo.material.Ns), 0);
     float4 reflected = intensity * cameraAndLights.sunColor * float4(meshInfo.material.Ks, 1);
-    return saturate(direct);
+    return saturate(direct + reflected);
     #else
     //return float4(meshInfo.material.Kd,1);
     return float4(nrmW, 0);

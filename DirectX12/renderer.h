@@ -22,12 +22,17 @@ vector<Model> CompleteModelList;
 FileIO files;
 SCENE_DATA camerAndLights;
 
+
 // Creation, Rendering & Cleanup
 class Renderer
 {
-	string gameLevelPath = "../assets/GameLevel.txt";
+	float volume = 0.001f;
+
+	string gameLevelPath = "../assets/GameLevelTest.txt";
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
+	GW::AUDIO::GAudio Sounds;
+	GW::AUDIO::GMusic Music;
 
 	// proxy handles
 	GW::SYSTEM::GWindow win;
@@ -43,7 +48,7 @@ class Renderer
 	GW::MATH::GMATRIXF projM = GW::MATH::GIdentityMatrixF;
 	GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
 	//directional light
-	GW::MATH::GVECTORF light_direction = { -1.0f, -1.0f, 2.0f };
+	GW::MATH::GVECTORF light_direction = { -1.0f, -100.0f, 2.0f };
 	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
 
 public:
@@ -201,6 +206,9 @@ public:
 		Math.RotationYawPitchRollF(rotateX, rotateY, rotateZ, rotationM);
 		Math.TranslateGlobalF(view_copy, moveV, view_copy);
 		Math.MultiplyMatrixF(view_copy, rotationM, camerAndLights.viewMatrix);
+		GW::MATH::GVECTORF temp2;
+		Math.GetTranslationF(camerAndLights.viewMatrix, temp2);
+		camerAndLights.camPOS = temp2;
 		std::chrono::high_resolution_clock::time_point _start(std::chrono::high_resolution_clock::now());
 		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_start - _end).count();
 		//std::cout << duration << '\n';
@@ -215,7 +223,8 @@ public:
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 		KBM.Create(win);
-
+		//set h2b files read folder
+		files.h2BLocationFolder = "assets";
 		//Create Matrixes
 		//view
 		GW::MATH::GVECTORF eye = { 10.0f, 10.0f, -10.0f };
@@ -255,8 +264,7 @@ public:
 
 
 
-		//set h2b files read folder
-		files.h2BLocationFolder = "assets";
+		
 
 		//read files
 		files.ReadFile(gameLevelPath);
@@ -398,9 +406,17 @@ public:
 		creator->CreateGraphicsPipelineState(&psDesc, IID_PPV_ARGS(&pipeline));
 		// free temporary handle
 		creator->Release();
+
+		Sounds.Create();
+		Music.Create("../audio/music1.wav", Sounds, volume);
+		Music.Play();
+
+
+
 	}
 	void Render()
 	{
+		
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
