@@ -218,4 +218,9 @@ Model::Model()
 
 Model::~Model()
 {
+	vertList.clear();
+	indexList.clear();
+	materials.clear();
+	objects.clear();
+	meshAndMaterialDataList.clear();
 }

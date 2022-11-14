@@ -3,6 +3,12 @@
 #include "Model.h";
 #include "FileIO.h"
 
+struct Gamelevel
+{
+	std::string TXTname;
+	std::string H2Bfolder;
+
+};
 
 std::string ShaderAsString(const char* shaderFilePath) {
 	std::string output;
@@ -18,17 +24,22 @@ std::string ShaderAsString(const char* shaderFilePath) {
 	return output;
 }
 
+//vector<Model> CompleteModelList;
+//FileIO files;
+//SCENE_DATA camerAndLights;
+int currentLevel = 1;
 vector<Model> CompleteModelList;
-FileIO files;
-SCENE_DATA camerAndLights;
-
 
 // Creation, Rendering & Cleanup
 class Renderer
 {
-	float volume = 0.001f;
+	Gamelevel level1;
+	Gamelevel level2;
 
-	string gameLevelPath = "../assets/GameLevelTest.txt";
+	float volume = 0.001f;
+	std::string TXTname;
+	std::string H2Bfolder;
+
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
 	GW::AUDIO::GAudio Sounds;
@@ -52,6 +63,9 @@ class Renderer
 	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
 
 public:
+	FileIO files;
+	SCENE_DATA camerAndLights;
+	std::vector<Gamelevel> levels;
 	GW::MATH::GVECTORF eye = { 0 };
 	GW::MATH::GVECTORF at = { 0 };
 	GW::MATH::GVECTORF up = { 0 };
@@ -68,7 +82,7 @@ public:
 	float mSpeed = 500;
 	float defaultSpeed = 500;
 
-	void UpdateCamera()
+	void UpdateCamera(bool* _changeLevel)
 	{
 		KBM.Create(win);
 		Control.Create();
@@ -91,6 +105,8 @@ public:
 		float backward = 0;
 		float boost = 0;
 		float leftClick = 0;
+		float level1Select = 0;
+		float level2Select = 0;
 
 		bool connected = false;
 		Control.IsConnected(0, connected);
@@ -115,8 +131,27 @@ public:
 			}
 		}
 		KBM.GetState(G_KEY_Q, RollLeft);
+		KBM.GetState(G_KEY_1, level1Select);
+		KBM.GetState(G_KEY_2, level2Select);
 		KBM.GetState(G_KEY_E, RollRight);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
+		if (level1Select > 0)
+		{
+			if (currentLevel != 1)
+			{
+				currentLevel = 1;
+				*_changeLevel = true;
+			}
+		}
+		if (level2Select > 0)
+		{
+			if (currentLevel != 2)
+			{
+				currentLevel = 2;
+				*_changeLevel = true;
+			}
+		}
+
 		if (RollLeft > 0)
 		{
 			rotateZ = -(speed * duration) / 2;
@@ -216,6 +251,18 @@ public:
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
+		//set h2b files read folder
+		level1.TXTname = "../assets/GameLevelTEST.txt";
+		level1.H2Bfolder = "assets";
+		level2.TXTname = "../Test/GameLevel2.txt";
+		level2.H2Bfolder = "Test";
+
+
+		levels.push_back(level1);
+		levels.push_back(level2);
+
+		string gameLevelPath = levels[currentLevel - 1].TXTname;
+		files.h2BLocationFolder = levels[currentLevel - 1].H2Bfolder;
 		Math.Create();
 		KBM.Create(win);
 		win = _win;
@@ -223,8 +270,6 @@ public:
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 		KBM.Create(win);
-		//set h2b files read folder
-		files.h2BLocationFolder = "assets";
 		//Create Matrixes
 		//view
 		GW::MATH::GVECTORF eye = { 10.0f, 10.0f, -10.0f };
@@ -262,9 +307,6 @@ public:
 		test->GetDesc(&sw_desc);
 		int frames = sw_desc.BufferCount;
 
-
-
-		
 
 		//read files
 		files.ReadFile(gameLevelPath);
@@ -416,7 +458,7 @@ public:
 	}
 	void Render()
 	{
-		
+
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
@@ -465,5 +507,7 @@ public:
 	~Renderer()
 	{
 		// ComPtr will auto release so nothing to do here 
+		/*KBM.Relinquish();
+		Control.Relinquish();*/
 	}
 };

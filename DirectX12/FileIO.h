@@ -139,4 +139,6 @@ FileIO::FileIO()
 
 FileIO::~FileIO()
 {
+	//gameLevelObjects.clear();
+	//meshAndMaterialData.clear();
 }

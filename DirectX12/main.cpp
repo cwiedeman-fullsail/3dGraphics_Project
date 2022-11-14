@@ -15,11 +15,15 @@
 #include <chrono>
 #include "renderer.h"
 
+
+
 // open some namespaces to compact the code a bit
 using namespace GW;
 using namespace CORE;
 using namespace SYSTEM;
 using namespace GRAPHICS;
+bool changeLevel = false;
+
 // lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
 {
@@ -28,13 +32,12 @@ int main()
 	GDirectX12Surface d3d12;
 	if (+win.Create(0, 0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
 	{
-		// TODO: Part 1a
-		float clr[] = { 135.0f/256.0f, 206.0f/256.0f, 235.0f/256.0f, 1.0f }; // start with a jade color
+		float clr[] = { 135.0f / 256.0f, 206.0f / 256.0f, 235.0f / 256.0f, 1.0f }; // start with a jade color
 		msgs.Create([&](const GW::GEvent& e) {
 			GW::SYSTEM::GWindow::Events q;
-			//if (+e.Read(q) && q == GWindow::Events::RESIZE)
-			//	clr[0] += 0.01f; // move towards a orange as they resize
-		});
+		//if (+e.Read(q) && q == GWindow::Events::RESIZE)
+		//	clr[0] += 0.01f; // move towards a orange as they resize
+			});
 		win.Register(msgs);
 		if (+d3d12.Create(win, GW::GRAPHICS::DEPTH_BUFFER_SUPPORT))
 		{
@@ -42,19 +45,29 @@ int main()
 			Renderer renderer(win, d3d12); // init
 			while (+win.ProcessWindowEvents())
 			{
+				if (changeLevel)
+				{
+					CompleteModelList.clear();
+					renderer.~Renderer();
+					Renderer renderer(win, d3d12);
+					changeLevel = false;
+				}
 				if (+d3d12.StartFrame())
 				{
 					ID3D12GraphicsCommandList* cmd;
 					D3D12_CPU_DESCRIPTOR_HANDLE rtv;
 					D3D12_CPU_DESCRIPTOR_HANDLE dsv;
-					if (+d3d12.GetCommandList((void**)&cmd) && 
+					if (+d3d12.GetCommandList((void**)&cmd) &&
 						+d3d12.GetCurrentRenderTargetView((void**)&rtv) &&
 						+d3d12.GetDepthStencilView((void**)&dsv))
 					{
 						cmd->ClearRenderTargetView(rtv, clr, 0, nullptr);
 						cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
-						renderer.UpdateCamera();
-						renderer.Render(); // draw
+						renderer.UpdateCamera(&changeLevel);
+						if (!changeLevel)
+						{
+							renderer.Render(); // draw
+						}
 						d3d12.EndFrame(false);
 						cmd->Release();
 					}
