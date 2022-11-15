@@ -30,6 +30,7 @@ struct MESH_DATA
     unsigned int padding[28];
 };
 
+
 ConstantBuffer<SCENE_DATA> cameraAndLights : register(b0, Space0);
 ConstantBuffer<MESH_DATA> meshInfo : register(b1, Space0);
 

@@ -37,14 +37,15 @@ class Renderer
 	Gamelevel level1;
 	Gamelevel level2;
 
-	float volume = 0.001f;
+	float volume = 0.01f;
 	std::string TXTname;
 	std::string H2Bfolder;
 
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
-	/*GW::AUDIO::GAudio Sounds;
-	GW::AUDIO::GMusic Music;*/
+	GW::AUDIO::GAudio Sounds;
+	GW::AUDIO::GMusic Music;
+	GW::AUDIO::GSound SFX;
 
 	// proxy handles
 	GW::SYSTEM::GWindow win;
@@ -92,6 +93,7 @@ public:
 	{
 		KBM.Create(win);
 		Control.Create();
+		
 		std::chrono::high_resolution_clock::time_point _end(std::chrono::high_resolution_clock::now());
 
 		moveV = { 0 };
@@ -117,6 +119,9 @@ public:
 		float cameraPreset2 = 0;
 		float cameraPreset3 = 0;
 		float cameraRESET = 0;
+		float volUP = 0;
+		float volDOWN = 0;
+		float sFX = 0;
 
 		bool connected = false;
 		Control.IsConnected(0, connected);
@@ -146,6 +151,9 @@ public:
 		KBM.GetState(G_KEY_3, cameraPreset3);
 		KBM.GetState(G_KEY_ESCAPE, cameraRESET);
 		KBM.GetState(G_KEY_E, RollRight);
+		KBM.GetState(G_KEY_F, sFX);
+		KBM.GetState(G_KEY_NUMPAD_ADD, volUP);
+		KBM.GetState(G_KEY_NUMPAD_SUBTRACT, volDOWN);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
 		if (cameraPreset1 > 0)
 		{
@@ -157,7 +165,7 @@ public:
 		}
 		if (cameraPreset2 > 0)
 		{
-			eye = { 100.0f, 100.0f, 100.0f };
+			eye = { 40.0f, 40.0f, 40.0f };
 			at = { 0.1f, 0.1f, 0.1f };
 			up = { 0.0f, 1.0f, 0.0f };
 			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
@@ -169,13 +177,20 @@ public:
 			up = { 0.0f, 1.0f, 0.0f };
 			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
 		}
-		if (cameraRESET > 0)
+		if (volUP > 0)
 		{
-			std::cout << "ESCAPE\n";
-			GW::MATH::GVECTORF eye = { 5.0f, 5.0f, -10.0f };
-			GW::MATH::GVECTORF at = { -30.0f,0.0f,1.0f };
-			GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
-			Math.LookAtLHF(eye, at, up, camerAndLights.viewMatrix);
+			volume += 0.0001f;
+			Music.SetVolume(volume);
+		}
+		if (volDOWN > 0)
+		{
+			volume -= 0.0001f;
+			Music.SetVolume(volume);
+		}
+		if (sFX > 0)
+		{
+			SFX.Create("../audio/Bonk.wav",Sounds,0.1f);
+			SFX.Play();
 		}
 
 		if (RollLeft > 0)
@@ -283,6 +298,7 @@ public:
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
+		
 		//set h2b files read folder
 		level1.TXTname = "../assets/GameLevelTEST.txt";
 		level1.H2Bfolder = "assets";
@@ -507,9 +523,9 @@ public:
 		miniView.MinDepth = 0;
 		miniView.MaxDepth = 0.001;
 		views.push_back(miniView);
-		/*Sounds.Create();
+		Sounds.Create();
 		Music.Create("../audio/music1.wav", Sounds, volume);
-		Music.Play();*/
+		Music.Play();
 
 
 
