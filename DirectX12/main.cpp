@@ -4,7 +4,7 @@
 #define GATEWARE_ENABLE_GRAPHICS // Enables all Graphics Libraries
 #define GATEWARE_ENABLE_MATH
 #define GATEWARE_ENABLE_INPUT
-#define GATEWARE_ENABLE_AUDIO
+//#define GATEWARE_ENABLE_AUDIO
 // Ignore some GRAPHICS libraries we aren't going to use
 #define GATEWARE_DISABLE_GDIRECTX11SURFACE // we have another template for this
 #define GATEWARE_DISABLE_GOPENGLSURFACE // we have another template for this
@@ -22,7 +22,7 @@ using namespace GW;
 using namespace CORE;
 using namespace SYSTEM;
 using namespace GRAPHICS;
-bool changeLevel = false;
+//bool changeLevel = false;
 
 // lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
@@ -30,7 +30,7 @@ int main()
 	GWindow win;
 	GEventResponder msgs;
 	GDirectX12Surface d3d12;
-	if (+win.Create(0, 0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
+	if (+win.Create(0,0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
 	{
 		float clr[] = { 135.0f / 256.0f, 206.0f / 256.0f, 235.0f / 256.0f, 1.0f }; // start with a jade color
 		msgs.Create([&](const GW::GEvent& e) {
@@ -45,13 +45,6 @@ int main()
 			Renderer renderer(win, d3d12); // init
 			while (+win.ProcessWindowEvents())
 			{
-				if (changeLevel)
-				{
-					CompleteModelList.clear();
-					renderer.~Renderer();
-					Renderer renderer(win, d3d12);
-					changeLevel = false;
-				}
 				if (+d3d12.StartFrame())
 				{
 					ID3D12GraphicsCommandList* cmd;
@@ -63,11 +56,9 @@ int main()
 					{
 						cmd->ClearRenderTargetView(rtv, clr, 0, nullptr);
 						cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
-						renderer.UpdateCamera(&changeLevel);
-						if (!changeLevel)
-						{
-							renderer.Render(); // draw
-						}
+						renderer.UpdateCamera();
+						renderer.Render();
+						renderer.RenderMiniMap();// draw
 						d3d12.EndFrame(false);
 						cmd->Release();
 					}

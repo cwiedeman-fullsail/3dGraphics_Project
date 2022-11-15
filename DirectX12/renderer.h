@@ -29,6 +29,7 @@ std::string ShaderAsString(const char* shaderFilePath) {
 //SCENE_DATA camerAndLights;
 int currentLevel = 1;
 vector<Model> CompleteModelList;
+vector<D3D12_VIEWPORT> views;
 
 // Creation, Rendering & Cleanup
 class Renderer
@@ -42,8 +43,8 @@ class Renderer
 
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
-	GW::AUDIO::GAudio Sounds;
-	GW::AUDIO::GMusic Music;
+	/*GW::AUDIO::GAudio Sounds;
+	GW::AUDIO::GMusic Music;*/
 
 	// proxy handles
 	GW::SYSTEM::GWindow win;
@@ -53,11 +54,15 @@ class Renderer
 	// what we need at a minimum to draw a triangle
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState>	pipeline;
+	D3D12_VIEWPORT mainView;
+	D3D12_VIEWPORT miniView;
+
 
 	//Matrixes
 	GW::MATH::GMATRIXF viewM = GW::MATH::GIdentityMatrixF;
 	GW::MATH::GMATRIXF projM = GW::MATH::GIdentityMatrixF;
 	GW::MATH::GMATRIXF worldM = GW::MATH::GIdentityMatrixF;
+	GW::MATH::GMATRIXF mapM = GW::MATH::GIdentityMatrixF;
 	//directional light
 	GW::MATH::GVECTORF light_direction = { -1.0f, -100.0f, 2.0f };
 	GW::MATH::GVECTORF light_color = { 0.9f, 0.9f, 1.0f, 1.0f };
@@ -65,6 +70,7 @@ class Renderer
 public:
 	FileIO files;
 	SCENE_DATA camerAndLights;
+	SCENE_DATA miniMap;
 	std::vector<Gamelevel> levels;
 	GW::MATH::GVECTORF eye = { 0 };
 	GW::MATH::GVECTORF at = { 0 };
@@ -82,7 +88,7 @@ public:
 	float mSpeed = 500;
 	float defaultSpeed = 500;
 
-	void UpdateCamera(bool* _changeLevel)
+	void UpdateCamera()
 	{
 		KBM.Create(win);
 		Control.Create();
@@ -107,6 +113,10 @@ public:
 		float leftClick = 0;
 		float level1Select = 0;
 		float level2Select = 0;
+		float cameraPreset1 = 0;
+		float cameraPreset2 = 0;
+		float cameraPreset3 = 0;
+		float cameraRESET = 0;
 
 		bool connected = false;
 		Control.IsConnected(0, connected);
@@ -131,25 +141,41 @@ public:
 			}
 		}
 		KBM.GetState(G_KEY_Q, RollLeft);
-		KBM.GetState(G_KEY_1, level1Select);
-		KBM.GetState(G_KEY_2, level2Select);
+		KBM.GetState(G_KEY_1, cameraPreset1);
+		KBM.GetState(G_KEY_2, cameraPreset2);
+		KBM.GetState(G_KEY_3, cameraPreset3);
+		KBM.GetState(G_KEY_ESCAPE, cameraRESET);
 		KBM.GetState(G_KEY_E, RollRight);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
-		if (level1Select > 0)
+		if (cameraPreset1 > 0)
 		{
-			if (currentLevel != 1)
-			{
-				currentLevel = 1;
-				*_changeLevel = true;
-			}
+			eye = { 20.0f, 20.0f, -1.0f };
+			at = { 0.1f, 0.1f, 0.1f };
+			up = { 0.0f, 1.0f, 0.0f };
+			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
+			
 		}
-		if (level2Select > 0)
+		if (cameraPreset2 > 0)
 		{
-			if (currentLevel != 2)
-			{
-				currentLevel = 2;
-				*_changeLevel = true;
-			}
+			eye = { 100.0f, 100.0f, 100.0f };
+			at = { 0.1f, 0.1f, 0.1f };
+			up = { 0.0f, 1.0f, 0.0f };
+			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
+		}
+		if (cameraPreset3 > 0)
+		{
+			eye = { 5.0f, 5.0f, 5.0f };
+			at = { 0.1f, 0.1f, 0.1f };
+			up = { 0.0f, 1.0f, 0.0f };
+			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
+		}
+		if (cameraRESET > 0)
+		{
+			std::cout << "ESCAPE\n";
+			GW::MATH::GVECTORF eye = { 5.0f, 5.0f, -10.0f };
+			GW::MATH::GVECTORF at = { -30.0f,0.0f,1.0f };
+			GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
+			Math.LookAtLHF(eye, at, up, camerAndLights.viewMatrix);
 		}
 
 		if (RollLeft > 0)
@@ -238,9 +264,14 @@ public:
 		{
 			moveV.y = (-speed * duration) * Up;
 		};
-		Math.RotationYawPitchRollF(rotateX, rotateY, rotateZ, rotationM);
+		Math.RotationYawPitchRollF(0, 0, rotateZ, rotationM);
+		Math.RotateYLocalF(rotationM, rotateX, rotationM);
+		Math.RotateXGlobalF(rotationM, rotateY, rotationM);
+
 		Math.TranslateGlobalF(view_copy, moveV, view_copy);
 		Math.MultiplyMatrixF(view_copy, rotationM, camerAndLights.viewMatrix);
+
+		//camera position for specular lights
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(camerAndLights.viewMatrix, temp2);
 		camerAndLights.camPOS = temp2;
@@ -248,6 +279,7 @@ public:
 		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_start - _end).count();
 		//std::cout << duration << '\n';
 	}
+
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
@@ -272,20 +304,20 @@ public:
 		KBM.Create(win);
 		//Create Matrixes
 		//view
-		GW::MATH::GVECTORF eye = { 10.0f, 10.0f, -10.0f };
-		GW::MATH::GVECTORF at = { 0 };
+		GW::MATH::GVECTORF eye = { 5.0f, 5.0f, -10.0f };
+		GW::MATH::GVECTORF at = { -30.0f,0.0f,1.0f };
 		GW::MATH::GVECTORF up = { 0.0f, 1.0f, 0.0f };
 		Math.LookAtLHF(eye, at, up, viewM);
 
-		//projection
-		UINT width;
-		UINT height;
-		float aspect;
-		win.GetWidth(width);
-		win.GetHeight(height);
-		aspect = (float)width / (float)height;
-		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 1000, projM);
+		eye = { 20.0f, 20.0f, -1.0f };
+		at = {  0.1f, 0.1f, 0.1f };
+		up = { 0.0f, 1.0f, 0.0f };
+		Math.LookAtLHF(eye, at, up, mapM);
 
+		//projection
+		float aspect;
+		d3d.GetAspectRatio(aspect);
+		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 1000, projM);
 
 		GW::MATH::GVector::NormalizeF(light_direction, camerAndLights.sunDirection);
 		//camerAndLights.sunDirection = light_direction;
@@ -293,6 +325,14 @@ public:
 		camerAndLights.viewMatrix = viewM;
 		camerAndLights.projectionMatrix = projM;
 		camerAndLights.sumAmb = { 0.25f, 0.25f, 0.35f, 1.0f };
+
+		GW::MATH::GVector::NormalizeF(light_direction, miniMap.sunDirection);
+		//camerAndLights.sunDirection = light_direction;
+		miniMap.sunColor = light_color;
+		miniMap.viewMatrix = mapM;
+		miniMap.projectionMatrix = projM;
+		miniMap.sumAmb = { 0.25f, 0.25f, 0.35f, 1.0f };
+
 
 		//caculate Camera Position
 		GW::MATH::GMATRIXF temp;
@@ -337,6 +377,7 @@ public:
 					files.meshAndMaterialData[i].materials[j].attrib.illum);
 				M.buildMeshList(files.meshAndMaterialData[i].meshes[j].drawInfo.indexCount, files.meshAndMaterialData[i].meshes[j].drawInfo.indexOffset);
 				M.CamandLight = camerAndLights;
+				M.MiniMap = miniMap;
 				MESH_DATA mesh;
 				mesh.worldMatrix = files.gameLevelObjects[i].pos;
 				mesh.material = M.materials[j];
@@ -428,7 +469,6 @@ public:
 			signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 
 
-
 		// create pipeline state
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psDesc;
 		ZeroMemory(&psDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
@@ -445,20 +485,37 @@ public:
 		psDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 		psDesc.SampleDesc.Count = 1;
-		creator->CreateGraphicsPipelineState(&psDesc, IID_PPV_ARGS(&pipeline));
+		creator->CreateGraphicsPipelineState(&psDesc, IID_PPV_ARGS(pipeline.GetAddressOf()));
 		// free temporary handle
 		creator->Release();
 
-		Sounds.Create();
+		UINT height;
+		UINT width;
+		win.GetHeight(height);
+		win.GetWidth(width);
+		mainView.Height = height;
+		mainView.Width = width;
+		mainView.TopLeftX = 0;
+		mainView.TopLeftY = 0;
+		mainView.MinDepth = 0;
+		mainView.MaxDepth = 1;
+		views.push_back(mainView);
+		miniView.Height = height / 4;
+		miniView.Width = width / 4;
+		miniView.TopLeftX = 20;
+		miniView.TopLeftY = 10;
+		miniView.MinDepth = 0;
+		miniView.MaxDepth = 0.001;
+		views.push_back(miniView);
+		/*Sounds.Create();
 		Music.Create("../audio/music1.wav", Sounds, volume);
-		Music.Play();
+		Music.Play();*/
 
 
 
 	}
 	void Render()
 	{
-
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
@@ -487,16 +544,62 @@ public:
 				//Update World Matrix for each mesh
 				UINT8* transferMemoryLocation;
 				CompleteModelList[i].meshAndMaterialDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
+				
+				cmd->SetGraphicsRootConstantBufferView(1,
+					CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() +
+					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
+
+				cmd->RSSetViewports(1, &mainView);
+				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
+					CompleteModelList[i].objects[j].indexOffset, 0, 0);
+			}
+		}
+		// release temp handles
+		cmd->Release();
+	}
+	void RenderMiniMap()
+	{
+		// grab the context & render target
+		ID3D12GraphicsCommandList* cmd;
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
+		D3D12_CPU_DESCRIPTOR_HANDLE dsv;
+		d3d.GetCommandList((void**)&cmd);
+		d3d.GetCurrentRenderTargetView((void**)&rtv);
+		d3d.GetDepthStencilView((void**)&dsv);
+		// setup the pipeline
+		cmd->SetGraphicsRootSignature(rootSignature.Get());
+		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+		cmd->SetPipelineState(pipeline.Get());
+		// now we can draw
+		for (size_t i = 0; i < CompleteModelList.size(); i++)
+		{
+			if (CompleteModelList[i].modelType != "MESH")
+			{
+				continue;
+			}
+			cmd->SetDescriptorHeaps(1, CompleteModelList[i].dHeap.GetAddressOf());
+			cmd->SetGraphicsRootConstantBufferView(0, CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() + sizeof(SCENE_DATA));
+			cmd->IASetVertexBuffers(0, 1, &CompleteModelList[i].vertexView);
+			cmd->IASetIndexBuffer(&CompleteModelList[i].indexView);
+			cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			for (size_t j = 0; j < CompleteModelList[i].meshCount; j++)
+			{
+				//Update World Matrix for each mesh
+				UINT8* transferMemoryLocation;
+				CompleteModelList[i].meshAndMaterialDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
 				CompleteModelList[i].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 					reinterpret_cast<void**>(&transferMemoryLocation));
 				memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
-				memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j),
+				memcpy(transferMemoryLocation + sizeof(SCENE_DATA), &miniMap, sizeof(SCENE_DATA));
+				memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j),
 					&CompleteModelList[i].meshAndMaterialDataList[j], sizeof(MESH_DATA));
 				CompleteModelList[i].constantBuffer->Unmap(0, nullptr);
 
 				cmd->SetGraphicsRootConstantBufferView(1,
 					CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() +
-					sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * j));
+					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
+
+				cmd->RSSetViewports(1, &miniView);
 				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
 					CompleteModelList[i].objects[j].indexOffset, 0, 0);
 			}
@@ -507,7 +610,5 @@ public:
 	~Renderer()
 	{
 		// ComPtr will auto release so nothing to do here 
-		/*KBM.Relinquish();
-		Control.Relinquish();*/
 	}
 };

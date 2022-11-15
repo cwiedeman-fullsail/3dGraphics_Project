@@ -80,6 +80,8 @@ public:
 	vector<Meshes>									objects;
 	vector<MESH_DATA>								meshAndMaterialDataList;
 	SCENE_DATA										CamandLight;
+	SCENE_DATA										MiniMap;
+
 
 	D3D12_VERTEX_BUFFER_VIEW						vertexView;
 	Microsoft::WRL::ComPtr<ID3D12Resource>			vertexBuffer;
@@ -166,8 +168,8 @@ public:
 
 	void createConstantBuffer(ID3D12Device* _creator, int _frames)
 	{
-		cbSize = (sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * matCount)) * _frames;
-		chunkSize = sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * matCount);
+		cbSize = ((sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * matCount)) * _frames;
+		chunkSize = (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * matCount);
 		_creator->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
@@ -183,8 +185,10 @@ public:
 			reinterpret_cast<void**>(&transferMemoryLocation));
 		memcpy(transferMemoryLocation, &CamandLight, sizeof(SCENE_DATA));
 		memcpy(transferMemoryLocation + chunkSize, &CamandLight, sizeof(SCENE_DATA));
-		memcpy(transferMemoryLocation + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
-		memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
+		memcpy(transferMemoryLocation + sizeof(SCENE_DATA), &MiniMap, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA), &MiniMap, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
+		memcpy(transferMemoryLocation + chunkSize + (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * _matIndex), &_mesh, sizeof(MESH_DATA));
 		constantBuffer->Unmap(0, nullptr);
 
 	}
@@ -209,6 +213,7 @@ public:
 	{
 		cpuHandle = dHeap->GetCPUDescriptorHandleForHeapStart();
 	}
+
 };
 
 Model::Model()
@@ -218,9 +223,5 @@ Model::Model()
 
 Model::~Model()
 {
-	vertList.clear();
-	indexList.clear();
-	materials.clear();
-	objects.clear();
-	meshAndMaterialDataList.clear();
+	
 }
