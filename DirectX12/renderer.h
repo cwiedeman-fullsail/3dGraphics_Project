@@ -72,6 +72,7 @@ public:
 	FileIO files;
 	SCENE_DATA camerAndLights;
 	SCENE_DATA miniMap;
+	MESH_DATA boundingMesh;
 	std::vector<Gamelevel> levels;
 	GW::MATH::GVECTORF eye = { 0 };
 	GW::MATH::GVECTORF at = { 0 };
@@ -89,11 +90,11 @@ public:
 	float mSpeed = 500;
 	float defaultSpeed = 500;
 
-	void UpdateCamera()
+	void UpdateCamera(bool* _bounds)
 	{
 		KBM.Create(win);
 		Control.Create();
-		
+
 		std::chrono::high_resolution_clock::time_point _end(std::chrono::high_resolution_clock::now());
 
 		moveV = { 0 };
@@ -122,6 +123,7 @@ public:
 		float volUP = 0;
 		float volDOWN = 0;
 		float sFX = 0;
+		float renderBounds = 0;
 
 		bool connected = false;
 		Control.IsConnected(0, connected);
@@ -152,6 +154,7 @@ public:
 		KBM.GetState(G_KEY_ESCAPE, cameraRESET);
 		KBM.GetState(G_KEY_E, RollRight);
 		KBM.GetState(G_KEY_F, sFX);
+		KBM.GetState(G_KEY_R, renderBounds);
 		KBM.GetState(G_KEY_NUMPAD_ADD, volUP);
 		KBM.GetState(G_KEY_NUMPAD_SUBTRACT, volDOWN);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
@@ -161,7 +164,7 @@ public:
 			at = { 0.1f, 0.1f, 0.1f };
 			up = { 0.0f, 1.0f, 0.0f };
 			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
-			
+
 		}
 		if (cameraPreset2 > 0)
 		{
@@ -189,8 +192,13 @@ public:
 		}
 		if (sFX > 0)
 		{
-			SFX.Create("../audio/Bonk.wav",Sounds,0.1f);
+			SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
 			SFX.Play();
+		}
+
+		if (renderBounds > 0)
+		{
+			*_bounds = !(*_bounds);
 		}
 
 		if (RollLeft > 0)
@@ -298,7 +306,7 @@ public:
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
-		
+
 		//set h2b files read folder
 		level1.TXTname = "../assets/GameLevelTEST.txt";
 		level1.H2Bfolder = "assets";
@@ -326,7 +334,7 @@ public:
 		Math.LookAtLHF(eye, at, up, viewM);
 
 		eye = { 20.0f, 20.0f, -1.0f };
-		at = {  0.1f, 0.1f, 0.1f };
+		at = { 0.1f, 0.1f, 0.1f };
 		up = { 0.0f, 1.0f, 0.0f };
 		Math.LookAtLHF(eye, at, up, mapM);
 
@@ -378,6 +386,7 @@ public:
 			M.matCount = files.meshAndMaterialData[i].materialCount;
 			M.meshCount = files.meshAndMaterialData[i].meshCount;
 			M.createConstantBuffer(creator, frames);
+			M.createBoundingConstantBuffer(creator, frames);
 			for (size_t j = 0; j < files.meshAndMaterialData[i].materialCount; j++)
 			{
 				M.buildMateralAttributeList(
@@ -401,8 +410,10 @@ public:
 				M.loadMaterialsToGPU(&M.meshAndMaterialDataList[j], j);
 				M.createDescriptorHeap(creator);
 				M.createCBView();
+				M.createBoundingCBView();
 			}
-
+			M.boundingMesh.worldMatrix = files.gameLevelObjects[i].pos;
+			M.loadBoundingMaterialsToGPU(&M.boundingMesh);
 			// Create Vertex Buffer
 			for (size_t j = 0; j < files.meshAndMaterialData[i].vertices.size(); j++)
 			{
@@ -420,15 +431,19 @@ public:
 				v.nrm.z = files.meshAndMaterialData[i].vertices[j].nrm.z;
 				M.addToVertList(v);
 			}
+			M.GenerateBounds(M.vertList);
 			M.createVertexBuffer(creator);
+			M.createBoundingVertexBuffer(creator);
 
 			//Create Index Buffer
 			for (size_t j = 0; j < files.meshAndMaterialData[i].indices.size(); j++)
 			{
 				M.addToIndexList(files.meshAndMaterialData[i].indices[j]);
 			}
-			M.createIndexBuffer(creator);
 
+
+			M.createIndexBuffer(creator);
+			M.createBoundingIndexBuffer(creator);
 			CompleteModelList.push_back(M);
 		}
 
@@ -560,7 +575,14 @@ public:
 				//Update World Matrix for each mesh
 				UINT8* transferMemoryLocation;
 				CompleteModelList[i].meshAndMaterialDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
-				
+				CompleteModelList[i].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+					reinterpret_cast<void**>(&transferMemoryLocation));
+				memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
+				memcpy(transferMemoryLocation + sizeof(SCENE_DATA), &miniMap, sizeof(SCENE_DATA));
+				memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j),
+					&CompleteModelList[i].meshAndMaterialDataList[j], sizeof(MESH_DATA));
+				CompleteModelList[i].constantBuffer->Unmap(0, nullptr);
+
 				cmd->SetGraphicsRootConstantBufferView(1,
 					CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() +
 					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
@@ -601,15 +623,7 @@ public:
 			for (size_t j = 0; j < CompleteModelList[i].meshCount; j++)
 			{
 				//Update World Matrix for each mesh
-				UINT8* transferMemoryLocation;
-				CompleteModelList[i].meshAndMaterialDataList[j].worldMatrix = files.gameLevelObjects[i].pos;
-				CompleteModelList[i].constantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
-					reinterpret_cast<void**>(&transferMemoryLocation));
-				memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
-				memcpy(transferMemoryLocation + sizeof(SCENE_DATA), &miniMap, sizeof(SCENE_DATA));
-				memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j),
-					&CompleteModelList[i].meshAndMaterialDataList[j], sizeof(MESH_DATA));
-				CompleteModelList[i].constantBuffer->Unmap(0, nullptr);
+
 
 				cmd->SetGraphicsRootConstantBufferView(1,
 					CompleteModelList[i].constantBuffer->GetGPUVirtualAddress() +
@@ -619,6 +633,47 @@ public:
 				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
 					CompleteModelList[i].objects[j].indexOffset, 0, 0);
 			}
+		}
+		// release temp handles
+		cmd->Release();
+	}
+	void RenderBounds()
+	{
+		// grab the context & render target
+		ID3D12GraphicsCommandList* cmd;
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
+		D3D12_CPU_DESCRIPTOR_HANDLE dsv;
+		d3d.GetCommandList((void**)&cmd);
+		d3d.GetCurrentRenderTargetView((void**)&rtv);
+		d3d.GetDepthStencilView((void**)&dsv);
+		// setup the pipeline
+		cmd->SetGraphicsRootSignature(rootSignature.Get());
+		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+		cmd->SetPipelineState(pipeline.Get());
+		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		// now we can draw
+		for (size_t i = 0; i < CompleteModelList.size(); i++)
+		{
+			if (CompleteModelList[i].modelType != "MESH")
+			{
+				continue;
+			}
+			cmd->SetGraphicsRootConstantBufferView(0, CompleteModelList[i].BoundingconstantBuffer->GetGPUVirtualAddress());
+			cmd->SetDescriptorHeaps(1, CompleteModelList[i].dHeap.GetAddressOf());
+			cmd->IASetIndexBuffer(&CompleteModelList[i].boundingindexView);
+			cmd->IASetVertexBuffers(0, 1, &CompleteModelList[i].boundingvertexView);
+			UINT8* transferMemoryLocation;
+			CompleteModelList[i].BoundingconstantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+				reinterpret_cast<void**>(&transferMemoryLocation));
+			memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
+			memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2),
+				&CompleteModelList[i].boundingMesh, sizeof(MESH_DATA));
+			CompleteModelList[i].BoundingconstantBuffer->Unmap(0, nullptr);
+			cmd->SetGraphicsRootConstantBufferView(1,
+				CompleteModelList[i].BoundingconstantBuffer->GetGPUVirtualAddress() +
+				(sizeof(SCENE_DATA) * 2));
+			cmd->RSSetViewports(1, &mainView);
+			cmd->DrawIndexedInstanced(CompleteModelList[i].boundIList.size(), 1, 0, 0, 0);
 		}
 		// release temp handles
 		cmd->Release();

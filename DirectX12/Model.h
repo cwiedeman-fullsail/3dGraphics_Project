@@ -9,10 +9,27 @@ using namespace std;
 struct VEC3
 {
 	float x, y, z;
+	VEC3()
+	{};
+	VEC3(float _x, float _y, float _z)
+	{
+		x = _x;
+		y = _y;
+		z = _z;
+	}
 };
 struct VEC4
 {
 	float x, y, z, w;
+	VEC4()
+	{};
+	VEC4(float _x, float _y, float _z,float _w)
+	{
+		x = _x;
+		y = _y;
+		z = _z;
+		w = _w;
+	}
 };
 
 struct Vertex
@@ -20,6 +37,13 @@ struct Vertex
 	VEC4									pos;
 	VEC4									uvw;
 	VEC3									nrm;
+	Vertex() {};
+	Vertex(VEC4 _pos, VEC4 _uvw, VEC3 _nrm)
+	{
+		pos = _pos;
+		uvw = _uvw;
+		nrm = _nrm;
+	}
 };
 
 struct Material_Attributes
@@ -78,7 +102,10 @@ public:
 
 	vector<Material_Attributes>						materials;
 	vector<Meshes>									objects;
+	vector<Vertex>									boundVList;
+	vector<unsigned>								boundIList;
 	vector<MESH_DATA>								meshAndMaterialDataList;
+	MESH_DATA										boundingMesh;
 	SCENE_DATA										CamandLight;
 	SCENE_DATA										MiniMap;
 
@@ -88,6 +115,11 @@ public:
 	D3D12_INDEX_BUFFER_VIEW							indexView;
 	Microsoft::WRL::ComPtr<ID3D12Resource>			indexBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource>			constantBuffer;
+	D3D12_VERTEX_BUFFER_VIEW						boundingvertexView;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			boundingvertexBuffer;
+	D3D12_INDEX_BUFFER_VIEW							boundingindexView;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			boundingindexBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource>			BoundingconstantBuffer;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>	dHeap;
 	CD3DX12_CPU_DESCRIPTOR_HANDLE					cpuHandle;
 
@@ -213,6 +245,185 @@ public:
 	{
 		cpuHandle = dHeap->GetCPUDescriptorHandleForHeapStart();
 	}
+	void createBoundingVertexBuffer(ID3D12Device* _creator)
+	{
+		_creator->CreateCommittedResource( // using UPLOAD heap for simplicity
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // DEFAULT recommend  
+			D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(sizeof(Vertex) * boundVList.size()),
+			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&boundingvertexBuffer));
+		// Transfer triangle data to the vertex buffer.
+		UINT8* transferMemoryLocation;
+		boundingvertexBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+			reinterpret_cast<void**>(&transferMemoryLocation));
+		memcpy(transferMemoryLocation, boundVList.data(), sizeof(Vertex) * boundVList.size());
+		boundingvertexBuffer->Unmap(0, nullptr);
+		// Create a vertex View to send to a Draw() call.
+		boundingvertexView.BufferLocation = boundingvertexBuffer->GetGPUVirtualAddress();
+		boundingvertexView.StrideInBytes = sizeof(Vertex);
+		boundingvertexView.SizeInBytes = sizeof(Vertex) * boundVList.size();
+	}
+
+	void createBoundingIndexBuffer(ID3D12Device* _creator)
+	{
+		_creator->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE, &CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * boundIList.size()),
+			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&boundingindexBuffer));
+		UINT8* transferMemoryLocation;
+		boundingindexBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+			reinterpret_cast<void**>(&transferMemoryLocation));
+		memcpy(transferMemoryLocation, boundIList.data(), sizeof(float) * boundIList.size());
+		boundingindexBuffer->Unmap(0, nullptr);
+		boundingindexView.BufferLocation = boundingindexBuffer->GetGPUVirtualAddress();
+		boundingindexView.Format = DXGI_FORMAT_R32_UINT;
+		boundingindexView.SizeInBytes = sizeof(float) * boundIList.size();
+	}
+	void createBoundingConstantBuffer(ID3D12Device* _creator, int _frames)
+	{
+		cbSize = ((sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * matCount)) * _frames;
+		chunkSize = (sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * matCount);
+		_creator->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(cbSize),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(BoundingconstantBuffer.GetAddressOf()));
+	}
+
+	void createBoundingCBView()
+	{
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = BoundingconstantBuffer->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = cbSize;
+	}
+
+	void loadBoundingMaterialsToGPU(MESH_DATA* _mesh)
+	{
+		UINT8* transferMemoryLocation;
+		BoundingconstantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
+			reinterpret_cast<void**>(&transferMemoryLocation));
+		memcpy(transferMemoryLocation, &CamandLight, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + chunkSize, &CamandLight, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + sizeof(SCENE_DATA), &MiniMap, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + chunkSize + sizeof(SCENE_DATA), &MiniMap, sizeof(SCENE_DATA));
+		memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2), &_mesh, sizeof(MESH_DATA));
+		memcpy(transferMemoryLocation + chunkSize + (sizeof(SCENE_DATA) * 2), &_mesh, sizeof(MESH_DATA));
+		BoundingconstantBuffer->Unmap(0, nullptr);
+
+	}
+	void GenerateBounds(vector<Vertex> _vList)
+	{
+		float minX = NULL;
+		float maxX = NULL;
+		float minY = NULL;
+		float maxY = NULL;
+		float minZ = NULL;
+		float maxZ = NULL;
+
+		for (size_t i = 0; i < _vList.size(); i++)
+		{
+			if (minX == NULL)
+			{
+				minX = _vList[i].pos.x;
+			}
+			else
+			{
+				if (_vList[i].pos.x < minX)
+				{
+					minX = _vList[i].pos.x;
+				}
+			}
+			if (maxX == NULL)
+			{
+				maxX = _vList[i].pos.x;
+			}
+			else
+			{
+				if (_vList[i].pos.x > maxX)
+				{
+					maxX = _vList[i].pos.x;
+				}
+			}
+			if (minY == NULL)
+			{
+				minY = _vList[i].pos.y;
+			}
+			else
+			{
+				if (_vList[i].pos.y < minY)
+				{
+					minY = _vList[i].pos.y;
+				}
+			}
+			if (maxY == NULL)
+			{
+				maxY = _vList[i].pos.y;
+			}
+			else
+			{
+				if (_vList[i].pos.y > maxY)
+				{
+					maxY = _vList[i].pos.y;
+				}
+			}
+			if (minZ == NULL)
+			{
+				minZ = _vList[i].pos.z;
+			}
+			else
+			{
+				if (_vList[i].pos.z < minZ)
+				{
+					minZ = _vList[i].pos.z;
+				}
+			}
+			if (maxZ == NULL)
+			{
+				maxZ = _vList[i].pos.z;
+			}
+			else
+			{
+				if (_vList[i].pos.z > maxZ)
+				{
+					maxZ = _vList[i].pos.z;
+				}
+			}
+		}
+		Vertex _1 = { VEC4(minX, maxY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _2 = { VEC4(minX, maxY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _3 = { VEC4(maxX, maxY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _4 = { VEC4(maxX, maxY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _5 = { VEC4(minX, minY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _6 = { VEC4(minX, minY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _7 = { VEC4(maxX, minY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		Vertex _8 = { VEC4(maxX, minY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		boundVList.push_back(_1);
+		boundVList.push_back(_2);
+		boundVList.push_back(_3);
+		boundVList.push_back(_4);
+		boundVList.push_back(_5);
+		boundVList.push_back(_6);
+		boundVList.push_back(_7);
+		boundVList.push_back(_8);
+		boundIList = {
+		0,1,
+		1,2,
+		2,3,
+		3,0,
+		4,5,
+		5,6,
+		6,7,
+		7,4,
+		0,4,
+		3,7,
+		1,5,
+		2,6
+		};
+
+	}
+
+
 
 };
 
@@ -223,5 +434,5 @@ Model::Model()
 
 Model::~Model()
 {
-	
+
 }
