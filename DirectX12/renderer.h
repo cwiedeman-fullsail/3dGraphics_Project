@@ -1,5 +1,8 @@
 // minimalistic code to draw a single triangle, this is not part of the API.
 // required for compiling shaders on the fly, consider pre-compiling instead
+
+// Frustrum Culling adapted from https://www.braynzarsoft.net/viewtutorial/q16390-34-aabb-cpu-side-frustum-culling
+
 #include "Model.h";
 #include "FileIO.h"
 
@@ -30,6 +33,9 @@ std::string ShaderAsString(const char* shaderFilePath) {
 int currentLevel = 1;
 vector<Model> CompleteModelList;
 vector<D3D12_VIEWPORT> views;
+vector<GW::MATH::GVECTORF>FrustumPlane;
+
+
 
 // Creation, Rendering & Cleanup
 class Renderer
@@ -51,6 +57,7 @@ class Renderer
 	GW::SYSTEM::GWindow win;
 	GW::GRAPHICS::GDirectX12Surface d3d;
 	GW::MATH::GMatrix Math;
+	GW::MATH::GVector Math2;
 
 	// what we need at a minimum to draw a triangle
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
@@ -303,6 +310,94 @@ public:
 		//std::cout << duration << '\n';
 	}
 
+	std::vector<GW::MATH::GVECTORF> getFrustumPlanes(GW::MATH::GMATRIXF& viewProj)
+	{
+		std::vector<GW::MATH::GVECTORF> tempFrustumPlane(6);
+
+		tempFrustumPlane[0].x = viewProj.row1.w + viewProj.row1.x;
+		tempFrustumPlane[0].y = viewProj.row2.w + viewProj.row2.x;
+		tempFrustumPlane[0].z = viewProj.row3.w + viewProj.row3.x;
+		tempFrustumPlane[0].w = viewProj.row4.w + viewProj.row4.x;
+
+		tempFrustumPlane[1].x = viewProj.row1.w - viewProj.row1.x;
+		tempFrustumPlane[1].y = viewProj.row2.w - viewProj.row2.x;
+		tempFrustumPlane[1].z = viewProj.row3.w - viewProj.row3.x;
+		tempFrustumPlane[1].w = viewProj.row4.w - viewProj.row4.x;
+
+		tempFrustumPlane[2].x = viewProj.row1.w - viewProj.row1.y;
+		tempFrustumPlane[2].y = viewProj.row2.w - viewProj.row2.y;
+		tempFrustumPlane[2].z = viewProj.row3.w - viewProj.row3.y;
+		tempFrustumPlane[2].w = viewProj.row4.w - viewProj.row4.y;
+
+		tempFrustumPlane[3].x = viewProj.row1.w + viewProj.row1.y;
+		tempFrustumPlane[3].y = viewProj.row2.w + viewProj.row2.y;
+		tempFrustumPlane[3].z = viewProj.row3.w + viewProj.row3.y;
+		tempFrustumPlane[3].w = viewProj.row4.w + viewProj.row4.y;
+
+		tempFrustumPlane[4].x = viewProj.row1.z;
+		tempFrustumPlane[4].y = viewProj.row2.z;
+		tempFrustumPlane[4].z = viewProj.row3.z;
+		tempFrustumPlane[4].w = viewProj.row4.z;
+
+		tempFrustumPlane[5].x = viewProj.row1.w + viewProj.row1.z;
+		tempFrustumPlane[5].y = viewProj.row2.w + viewProj.row2.z;
+		tempFrustumPlane[5].z = viewProj.row3.w + viewProj.row3.z;
+		tempFrustumPlane[5].w = viewProj.row4.w + viewProj.row4.z;
+
+		for (int i = 0; i < 6; ++i)
+		{
+			float length = sqrt((tempFrustumPlane[i].x * tempFrustumPlane[i].x) + (tempFrustumPlane[i].y * tempFrustumPlane[i].y) + (tempFrustumPlane[i].z * tempFrustumPlane[i].z));
+			tempFrustumPlane[i].x /= length;
+			tempFrustumPlane[i].y /= length;
+			tempFrustumPlane[i].z /= length;
+			tempFrustumPlane[i].w /= length;
+		}
+
+		return tempFrustumPlane;
+	}
+	bool cullAABB(std::vector<GW::MATH::GVECTORF>& frustumPlanes, Model _m)
+	{
+		bool cull = false;
+
+		cull = false;
+		// Loop through each frustum plane
+		for (int planeID = 0; planeID < 6; ++planeID)
+		{
+			GW::MATH::GVECTORF planeNormal = { frustumPlanes[planeID].x, frustumPlanes[planeID].y, frustumPlanes[planeID].z, 0.0f };
+			float planeConstant = frustumPlanes[planeID].w;
+
+			// Check each axis (x,y,z) to get the AABB vertex furthest away from the direction the plane is facing (plane normal)
+			GW::MATH::GVECTORF axisVert;
+
+			GW::MATH::GVECTORF pos;
+			Math.GetTranslationF(_m.worldMatrix, pos);
+			// x-axis
+			if (frustumPlanes[planeID].x < 0.0f)
+				axisVert.x = _m.AABB_List[0].x + pos.x;
+			else
+				axisVert.x = _m.AABB_List[1].x + pos.x;
+
+			// y-axis
+			if (frustumPlanes[planeID].y < 0.0f)
+				axisVert.y = _m.AABB_List[0].y + pos.y;
+			else
+				axisVert.y = _m.AABB_List[1].y + pos.y;
+
+			// z-axis
+			if (frustumPlanes[planeID].z < 0.0f)
+				axisVert.z = _m.AABB_List[0].z + pos.z;
+			else
+				axisVert.z = _m.AABB_List[1].z + pos.z;
+
+			float result;
+			Math2.DotF(planeNormal, axisVert, result);
+			if (result + planeConstant < 0.0f)
+			{
+				return false;
+			}
+		}
+
+	}
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
@@ -385,6 +480,7 @@ public:
 			M.iCount = files.meshAndMaterialData[i].indexCount;
 			M.matCount = files.meshAndMaterialData[i].materialCount;
 			M.meshCount = files.meshAndMaterialData[i].meshCount;
+			M.worldMatrix = files.gameLevelObjects[i].pos;
 			M.createConstantBuffer(creator, frames);
 			M.createBoundingConstantBuffer(creator, frames);
 			for (size_t j = 0; j < files.meshAndMaterialData[i].materialCount; j++)
@@ -444,6 +540,8 @@ public:
 
 			M.createIndexBuffer(creator);
 			M.createBoundingIndexBuffer(creator);
+			M.AABB_List = M.CreateAABB(M.vertList);
+
 			CompleteModelList.push_back(M);
 		}
 
@@ -547,6 +645,7 @@ public:
 	}
 	void Render()
 	{
+
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
@@ -558,6 +657,8 @@ public:
 		cmd->SetGraphicsRootSignature(rootSignature.Get());
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
+		GW::MATH::GMATRIXF VP;
+		Math.MultiplyMatrixF(camerAndLights.viewMatrix, camerAndLights.projectionMatrix, VP);
 		// now we can draw
 		for (size_t i = 0; i < CompleteModelList.size(); i++)
 		{
@@ -588,8 +689,11 @@ public:
 					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
 
 				cmd->RSSetViewports(1, &mainView);
-				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
-					CompleteModelList[i].objects[j].indexOffset, 0, 0);
+				if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+				{
+					cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
+						CompleteModelList[i].objects[j].indexOffset, 0, 0);
+				}
 			}
 		}
 		// release temp handles
@@ -608,6 +712,8 @@ public:
 		cmd->SetGraphicsRootSignature(rootSignature.Get());
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
+		GW::MATH::GMATRIXF VP;
+		Math.MultiplyMatrixF(camerAndLights.viewMatrix, camerAndLights.projectionMatrix, VP);
 		// now we can draw
 		for (size_t i = 0; i < CompleteModelList.size(); i++)
 		{
@@ -630,8 +736,11 @@ public:
 					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
 
 				cmd->RSSetViewports(1, &miniView);
-				cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
-					CompleteModelList[i].objects[j].indexOffset, 0, 0);
+				if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+				{
+					cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
+						CompleteModelList[i].objects[j].indexOffset, 0, 0);
+				}
 			}
 		}
 		// release temp handles
@@ -651,6 +760,8 @@ public:
 		cmd->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 		cmd->SetPipelineState(pipeline.Get());
 		cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		GW::MATH::GMATRIXF VP;
+		Math.MultiplyMatrixF(camerAndLights.viewMatrix, camerAndLights.projectionMatrix, VP);
 		// now we can draw
 		for (size_t i = 0; i < CompleteModelList.size(); i++)
 		{
@@ -673,7 +784,10 @@ public:
 				CompleteModelList[i].BoundingconstantBuffer->GetGPUVirtualAddress() +
 				(sizeof(SCENE_DATA) * 2));
 			cmd->RSSetViewports(1, &mainView);
-			cmd->DrawIndexedInstanced(CompleteModelList[i].boundIList.size(), 1, 0, 0, 0);
+			if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+			{
+				cmd->DrawIndexedInstanced(CompleteModelList[i].boundIList.size(), 1, 0, 0, 0);
+			}
 		}
 		// release temp handles
 		cmd->Release();

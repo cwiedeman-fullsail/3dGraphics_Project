@@ -31,6 +31,20 @@ struct VEC4
 		w = _w;
 	}
 };
+struct VEC4SET
+{
+	GW::MATH::GVECTORF x;
+	GW::MATH::GVECTORF y;
+	GW::MATH::GVECTORF z;
+	GW::MATH::GVECTORF w;
+	VEC4SET(GW::MATH::GVECTORF _x, GW::MATH::GVECTORF _y, GW::MATH::GVECTORF _z, GW::MATH::GVECTORF _w)
+	{
+		x = _x;
+		y = _y;
+		z = _z;
+		w = _w;
+	}
+};
 
 struct Vertex
 {
@@ -108,6 +122,9 @@ public:
 	MESH_DATA										boundingMesh;
 	SCENE_DATA										CamandLight;
 	SCENE_DATA										MiniMap;
+	GW::MATH::GMATRIXF								worldMatrix;
+	
+	std::vector<GW::MATH::GVECTORF>					AABB_List;
 
 
 	D3D12_VERTEX_BUFFER_VIEW						vertexView;
@@ -423,8 +440,29 @@ public:
 
 	}
 
+	std::vector<GW::MATH::GVECTORF> CreateAABB(std::vector<Vertex>& vertPosArray)
+	{
+		GW::MATH::GVECTORF minVertex = { FLT_MAX, FLT_MAX, FLT_MAX };
+		GW::MATH::GVECTORF maxVertex = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
+		for (UINT i = 0; i < vertPosArray.size(); i++)
+		{
+			minVertex.x = min(minVertex.x, vertPosArray[i].pos.x);
+			minVertex.y = min(minVertex.y, vertPosArray[i].pos.y);
+			minVertex.z = min(minVertex.z, vertPosArray[i].pos.z);
 
+			//Get the largest vertex 
+			maxVertex.x = max(maxVertex.x, vertPosArray[i].pos.x);
+			maxVertex.y = max(maxVertex.y, vertPosArray[i].pos.y);
+			maxVertex.z = max(maxVertex.z, vertPosArray[i].pos.z);
+		}
+		std::vector<GW::MATH::GVECTORF> AABB;
+
+		AABB.push_back(minVertex);
+		AABB.push_back(maxVertex);
+
+		return AABB;
+	}
 };
 
 Model::Model()

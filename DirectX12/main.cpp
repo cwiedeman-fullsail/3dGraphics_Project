@@ -31,7 +31,7 @@ int main()
 	GWindow win;
 	GEventResponder msgs;
 	GDirectX12Surface d3d12;
-	if (+win.Create(0, 0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
+	if (+win.Create(0, 0, 800, 600, GWindowStyle::FULLSCREENBORDERED))
 	{
 		float clr[] = { 135.0f / 256.0f, 206.0f / 256.0f, 235.0f / 256.0f, 1.0f }; // start with a jade color
 		msgs.Create([&](const GW::GEvent& e) {
