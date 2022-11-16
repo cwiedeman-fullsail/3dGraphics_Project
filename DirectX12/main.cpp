@@ -24,6 +24,7 @@ using namespace SYSTEM;
 using namespace GRAPHICS;
 //bool changeLevel = false;
 bool renderBoundries = false;
+bool miniMap = true;
 
 // lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
@@ -57,9 +58,12 @@ int main()
 					{
 						cmd->ClearRenderTargetView(rtv, clr, 0, nullptr);
 						cmd->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1, 0, 0, nullptr);
-						renderer.UpdateCamera(&renderBoundries);
+						renderer.UpdateCamera(&renderBoundries, &miniMap);
 						renderer.Render();
-						renderer.RenderMiniMap();// draw
+						if (miniMap)
+						{
+							renderer.RenderMiniMap();// draw
+						}
 						if (renderBoundries)
 						{
 							renderer.RenderBounds();

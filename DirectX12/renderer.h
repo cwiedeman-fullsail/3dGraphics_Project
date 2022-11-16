@@ -34,12 +34,16 @@ int currentLevel = 1;
 vector<Model> CompleteModelList;
 vector<D3D12_VIEWPORT> views;
 vector<GW::MATH::GVECTORF>FrustumPlane;
+bool culling = false;
 
 
 
 // Creation, Rendering & Cleanup
 class Renderer
 {
+#pragma region Declarations
+
+
 	Gamelevel level1;
 	Gamelevel level2;
 
@@ -92,17 +96,21 @@ public:
 
 	float mouseX;
 	float mouseY;
-	float duration = 0;
+	float duration = 0.0000000f;
 	float speed = 0;
-	float mSpeed = 500;
-	float defaultSpeed = 500;
+	float mSpeed = 20;
+	float defaultSpeed = 100;
+	bool pressed = false;
+	float pressTimer = 0;
+#pragma endregion
 
-	void UpdateCamera(bool* _bounds)
+#pragma region Camera and Controls
+	void UpdateCamera(bool* _bounds, bool* _mMapShow)
 	{
 		KBM.Create(win);
 		Control.Create();
 
-		std::chrono::high_resolution_clock::time_point _end(std::chrono::high_resolution_clock::now());
+		std::chrono::steady_clock::time_point _end(std::chrono::steady_clock::now());
 
 		moveV = { 0 };
 		rotationM = { 0 };
@@ -131,8 +139,12 @@ public:
 		float volDOWN = 0;
 		float sFX = 0;
 		float renderBounds = 0;
+		float cull = 0;
+		float miniMapShow = 0;
+		float musicToggle = 0;
 
 		bool connected = false;
+		GW::GReturn result;
 		Control.IsConnected(0, connected);
 		if (connected)
 		{
@@ -151,7 +163,7 @@ public:
 			};
 			if (boost > 0)
 			{
-				speed = 2000;
+				speed = 500;
 			}
 		}
 		KBM.GetState(G_KEY_Q, RollLeft);
@@ -162,6 +174,9 @@ public:
 		KBM.GetState(G_KEY_E, RollRight);
 		KBM.GetState(G_KEY_F, sFX);
 		KBM.GetState(G_KEY_R, renderBounds);
+		KBM.GetState(G_KEY_C, cull);
+		KBM.GetState(G_KEY_M, miniMapShow);
+		KBM.GetState(G_KEY_P, musicToggle);
 		KBM.GetState(G_KEY_NUMPAD_ADD, volUP);
 		KBM.GetState(G_KEY_NUMPAD_SUBTRACT, volDOWN);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
@@ -199,13 +214,29 @@ public:
 		}
 		if (sFX > 0)
 		{
-			SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
-			SFX.Play();
+			if (!pressed)
+			{
+				SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
+				SFX.Play();
+				pressed = true;
+			}
 		}
 
 		if (renderBounds > 0)
 		{
-			*_bounds = !(*_bounds);
+			if (!pressed)
+			{
+				*_bounds = !(*_bounds);
+				pressed = true;
+			}
+		}
+		if (cull > 0)
+		{
+			if (!pressed)
+			{
+				culling = !culling;
+				pressed = true;
+			}
 		}
 
 		if (RollLeft > 0)
@@ -221,6 +252,31 @@ public:
 		if (boost > 0)
 		{
 			speed = 2000;
+		}
+		if (miniMapShow > 0)
+		{
+			if (!pressed)
+			{
+				*_mMapShow = !(*_mMapShow);
+				pressed = true;
+			}
+		}
+		if (musicToggle > 0)
+		{
+			if (!pressed)
+			{
+				bool isPlaying = true;
+				Music.isPlaying(isPlaying);
+				if (isPlaying)
+				{
+					Music.Pause();
+				}
+				else
+				{
+					Music.Resume();
+				}
+				pressed = true;
+			}
 		}
 		KBM.GetState(G_KEY_SPACE, Up);
 		KBM.GetState(G_KEY_LEFTCONTROL, down);
@@ -255,7 +311,7 @@ public:
 		{
 			moveV.y = -speed * duration;
 		};
-		GW::GReturn result;
+
 		result = KBM.GetMouseDelta(mouseX, mouseY);
 		if (G_PASS(result) && result != GW::GReturn::REDUNDANT && leftClick > 0)
 		{
@@ -305,61 +361,76 @@ public:
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(camerAndLights.viewMatrix, temp2);
 		camerAndLights.camPOS = temp2;
-		std::chrono::high_resolution_clock::time_point _start(std::chrono::high_resolution_clock::now());
+		std::chrono::steady_clock::time_point _start(std::chrono::steady_clock::now());
 		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_start - _end).count();
+		if (pressed)
+		{
+			pressTimer += duration;
+			if (pressTimer > 0.001f)
+			{
+				pressed = false;
+				pressTimer = 0;
+			}
+		}
+		if (duration < 0.00001)
+		{
+			duration = 0.0001;
+		}
 		//std::cout << duration << '\n';
 	}
+#pragma endregion
+
+#pragma region Frustum Culling
+
 
 	std::vector<GW::MATH::GVECTORF> getFrustumPlanes(GW::MATH::GMATRIXF& viewProj)
 	{
-		std::vector<GW::MATH::GVECTORF> tempFrustumPlane(6);
+		std::vector<GW::MATH::GVECTORF> Frustum(6);
 
-		tempFrustumPlane[0].x = viewProj.row1.w + viewProj.row1.x;
-		tempFrustumPlane[0].y = viewProj.row2.w + viewProj.row2.x;
-		tempFrustumPlane[0].z = viewProj.row3.w + viewProj.row3.x;
-		tempFrustumPlane[0].w = viewProj.row4.w + viewProj.row4.x;
+		Frustum[0].x = viewProj.row1.w + viewProj.row1.x;
+		Frustum[0].y = viewProj.row2.w + viewProj.row2.x;
+		Frustum[0].z = viewProj.row3.w + viewProj.row3.x;
+		Frustum[0].w = viewProj.row4.w + viewProj.row4.x;
 
-		tempFrustumPlane[1].x = viewProj.row1.w - viewProj.row1.x;
-		tempFrustumPlane[1].y = viewProj.row2.w - viewProj.row2.x;
-		tempFrustumPlane[1].z = viewProj.row3.w - viewProj.row3.x;
-		tempFrustumPlane[1].w = viewProj.row4.w - viewProj.row4.x;
+		Frustum[1].x = viewProj.row1.w - viewProj.row1.x;
+		Frustum[1].y = viewProj.row2.w - viewProj.row2.x;
+		Frustum[1].z = viewProj.row3.w - viewProj.row3.x;
+		Frustum[1].w = viewProj.row4.w - viewProj.row4.x;
 
-		tempFrustumPlane[2].x = viewProj.row1.w - viewProj.row1.y;
-		tempFrustumPlane[2].y = viewProj.row2.w - viewProj.row2.y;
-		tempFrustumPlane[2].z = viewProj.row3.w - viewProj.row3.y;
-		tempFrustumPlane[2].w = viewProj.row4.w - viewProj.row4.y;
+		Frustum[2].x = viewProj.row1.w - viewProj.row1.y;
+		Frustum[2].y = viewProj.row2.w - viewProj.row2.y;
+		Frustum[2].z = viewProj.row3.w - viewProj.row3.y;
+		Frustum[2].w = viewProj.row4.w - viewProj.row4.y;
 
-		tempFrustumPlane[3].x = viewProj.row1.w + viewProj.row1.y;
-		tempFrustumPlane[3].y = viewProj.row2.w + viewProj.row2.y;
-		tempFrustumPlane[3].z = viewProj.row3.w + viewProj.row3.y;
-		tempFrustumPlane[3].w = viewProj.row4.w + viewProj.row4.y;
+		Frustum[3].x = viewProj.row1.w + viewProj.row1.y;
+		Frustum[3].y = viewProj.row2.w + viewProj.row2.y;
+		Frustum[3].z = viewProj.row3.w + viewProj.row3.y;
+		Frustum[3].w = viewProj.row4.w + viewProj.row4.y;
 
-		tempFrustumPlane[4].x = viewProj.row1.z;
-		tempFrustumPlane[4].y = viewProj.row2.z;
-		tempFrustumPlane[4].z = viewProj.row3.z;
-		tempFrustumPlane[4].w = viewProj.row4.z;
+		Frustum[4].x = viewProj.row1.z;
+		Frustum[4].y = viewProj.row2.z;
+		Frustum[4].z = viewProj.row3.z;
+		Frustum[4].w = viewProj.row4.z;
 
-		tempFrustumPlane[5].x = viewProj.row1.w + viewProj.row1.z;
-		tempFrustumPlane[5].y = viewProj.row2.w + viewProj.row2.z;
-		tempFrustumPlane[5].z = viewProj.row3.w + viewProj.row3.z;
-		tempFrustumPlane[5].w = viewProj.row4.w + viewProj.row4.z;
+		Frustum[5].x = viewProj.row1.w + viewProj.row1.z;
+		Frustum[5].y = viewProj.row2.w + viewProj.row2.z;
+		Frustum[5].z = viewProj.row3.w + viewProj.row3.z;
+		Frustum[5].w = viewProj.row4.w + viewProj.row4.z;
 
 		for (int i = 0; i < 6; ++i)
 		{
-			float length = sqrt((tempFrustumPlane[i].x * tempFrustumPlane[i].x) + (tempFrustumPlane[i].y * tempFrustumPlane[i].y) + (tempFrustumPlane[i].z * tempFrustumPlane[i].z));
-			tempFrustumPlane[i].x /= length;
-			tempFrustumPlane[i].y /= length;
-			tempFrustumPlane[i].z /= length;
-			tempFrustumPlane[i].w /= length;
+
+			float length = sqrt((Frustum[i].x * Frustum[i].x) + (Frustum[i].y * Frustum[i].y) + (Frustum[i].z * Frustum[i].z));
+			Frustum[i].x /= length;
+			Frustum[i].y /= length;
+			Frustum[i].z /= length;
+			Frustum[i].w /= length;
 		}
 
-		return tempFrustumPlane;
+		return Frustum;
 	}
-	bool cullAABB(std::vector<GW::MATH::GVECTORF>& frustumPlanes, Model _m)
+	bool isOnScreen(std::vector<GW::MATH::GVECTORF>& frustumPlanes, Model _m)
 	{
-		bool cull = false;
-
-		cull = false;
 		// Loop through each frustum plane
 		for (int planeID = 0; planeID < 6; ++planeID)
 		{
@@ -371,24 +442,18 @@ public:
 
 			GW::MATH::GVECTORF pos;
 			Math.GetTranslationF(_m.worldMatrix, pos);
-			// x-axis
 			if (frustumPlanes[planeID].x < 0.0f)
 				axisVert.x = _m.AABB_List[0].x + pos.x;
 			else
 				axisVert.x = _m.AABB_List[1].x + pos.x;
-
-			// y-axis
 			if (frustumPlanes[planeID].y < 0.0f)
 				axisVert.y = _m.AABB_List[0].y + pos.y;
 			else
 				axisVert.y = _m.AABB_List[1].y + pos.y;
-
-			// z-axis
 			if (frustumPlanes[planeID].z < 0.0f)
 				axisVert.z = _m.AABB_List[0].z + pos.z;
 			else
 				axisVert.z = _m.AABB_List[1].z + pos.z;
-
 			float result;
 			Math2.DotF(planeNormal, axisVert, result);
 			if (result + planeConstant < 0.0f)
@@ -396,8 +461,9 @@ public:
 				return false;
 			}
 		}
-
+		return true;
 	}
+#pragma endregion
 
 	Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX12Surface _d3d)
 	{
@@ -421,6 +487,8 @@ public:
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 		KBM.Create(win);
+
+#pragma region Matricies and Scene Data
 		//Create Matrixes
 		//view
 		GW::MATH::GVECTORF eye = { 5.0f, 5.0f, -10.0f };
@@ -450,7 +518,7 @@ public:
 		miniMap.sunColor = light_color;
 		miniMap.viewMatrix = mapM;
 		miniMap.projectionMatrix = projM;
-		miniMap.sumAmb = { 0.25f, 0.25f, 0.35f, 1.0f };
+		miniMap.sumAmb = { 0.55f, 0.25f, 0.25f, 1.0f };
 
 
 		//caculate Camera Position
@@ -459,6 +527,7 @@ public:
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(temp, temp2);
 		camerAndLights.camPOS = temp2;
+#pragma endregion
 
 		DXGI_SWAP_CHAIN_DESC sw_desc;
 		Microsoft::WRL::ComPtr <IDXGISwapChain4> test = nullptr;
@@ -471,6 +540,7 @@ public:
 		files.ReadFile(gameLevelPath);
 		files.ReadH2B();
 
+#pragma region Populate Model
 		for (size_t i = 0; i < files.meshAndMaterialData.size(); i++)
 		{
 			Model M;
@@ -544,6 +614,9 @@ public:
 
 			CompleteModelList.push_back(M);
 		}
+#pragma endregion
+
+#pragma region Create Shaders
 
 		// Create Vertex Shader
 		UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -570,6 +643,10 @@ public:
 			std::cout << (char*)errors->GetBufferPointer() << std::endl;
 			abort();
 		}
+#pragma endregion
+
+#pragma region Create InputLayout and Pipeline
+
 
 		// Create Input Layout
 		D3D12_INPUT_ELEMENT_DESC format[] =
@@ -617,6 +694,10 @@ public:
 		creator->CreateGraphicsPipelineState(&psDesc, IID_PPV_ARGS(pipeline.GetAddressOf()));
 		// free temporary handle
 		creator->Release();
+#pragma endregion
+
+#pragma region Set up Viewports and music
+
 
 		UINT height;
 		UINT width;
@@ -640,9 +721,11 @@ public:
 		Music.Create("../audio/music1.wav", Sounds, volume);
 		Music.Play();
 
-
-
 	}
+#pragma endregion
+
+#pragma region Render main Window
+
 	void Render()
 	{
 
@@ -689,7 +772,8 @@ public:
 					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
 
 				cmd->RSSetViewports(1, &mainView);
-				if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+
+				if (isOnScreen(getFrustumPlanes(VP), CompleteModelList[i]))
 				{
 					cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
 						CompleteModelList[i].objects[j].indexOffset, 0, 0);
@@ -699,6 +783,11 @@ public:
 		// release temp handles
 		cmd->Release();
 	}
+#pragma endregion
+
+#pragma region Render Mini Map
+
+
 	void RenderMiniMap()
 	{
 		// grab the context & render target
@@ -736,7 +825,15 @@ public:
 					(sizeof(SCENE_DATA) * 2) + (sizeof(MESH_DATA) * j));
 
 				cmd->RSSetViewports(1, &miniView);
-				if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+				if (culling)
+				{
+					if (isOnScreen(getFrustumPlanes(VP), CompleteModelList[i]))
+					{
+						cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
+							CompleteModelList[i].objects[j].indexOffset, 0, 0);
+					}
+				}
+				else
 				{
 					cmd->DrawIndexedInstanced(CompleteModelList[i].objects[j].indexCount, 1,
 						CompleteModelList[i].objects[j].indexOffset, 0, 0);
@@ -746,6 +843,11 @@ public:
 		// release temp handles
 		cmd->Release();
 	}
+#pragma endregion
+
+#pragma region Render Boundries
+
+
 	void RenderBounds()
 	{
 		// grab the context & render target
@@ -784,14 +886,15 @@ public:
 				CompleteModelList[i].BoundingconstantBuffer->GetGPUVirtualAddress() +
 				(sizeof(SCENE_DATA) * 2));
 			cmd->RSSetViewports(1, &mainView);
-			if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
-			{
-				cmd->DrawIndexedInstanced(CompleteModelList[i].boundIList.size(), 1, 0, 0, 0);
-			}
+			//if (cullAABB(getFrustumPlanes(VP), CompleteModelList[i]))
+			//{
+			cmd->DrawIndexedInstanced(CompleteModelList[i].boundIList.size(), 1, 0, 0, 0);
+			//}
 		}
 		// release temp handles
 		cmd->Release();
 	}
+#pragma endregion
 	~Renderer()
 	{
 		// ComPtr will auto release so nothing to do here 
