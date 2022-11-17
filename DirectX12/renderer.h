@@ -38,6 +38,7 @@ bool culling = false;
 
 
 
+
 // Creation, Rendering & Cleanup
 class Renderer
 {
@@ -47,9 +48,11 @@ class Renderer
 	Gamelevel level1;
 	Gamelevel level2;
 
-	float volume = 0.01f;
+	float volume = 0.005f;
 	std::string TXTname;
 	std::string H2Bfolder;
+	bool collided = false;
+	GW::MATH::GMATRIXF lastGoodPosition;
 
 	GW::INPUT::GInput KBM;
 	GW::INPUT::GController Control;
@@ -62,6 +65,7 @@ class Renderer
 	GW::GRAPHICS::GDirectX12Surface d3d;
 	GW::MATH::GMatrix Math;
 	GW::MATH::GVector Math2;
+	GW::MATH::GCollision Collision;
 
 	// what we need at a minimum to draw a triangle
 	Microsoft::WRL::ComPtr<ID3D12RootSignature>	rootSignature;
@@ -84,11 +88,14 @@ public:
 	SCENE_DATA camerAndLights;
 	SCENE_DATA miniMap;
 	MESH_DATA boundingMesh;
+	GW::MATH::GSPHEREF CameraCollider;
+
 	std::vector<Gamelevel> levels;
 	GW::MATH::GVECTORF eye = { 0 };
 	GW::MATH::GVECTORF at = { 0 };
 	GW::MATH::GVECTORF up = { 0 };
 	GW::MATH::GVECTORF moveV;
+	GW::MATH::GVECTORF LastMove;
 	GW::MATH::GMATRIXF rotationM;
 	float rotateX;
 	float rotateY;
@@ -104,7 +111,7 @@ public:
 	float pressTimer = 0;
 #pragma endregion
 
-#pragma region Camera and Controls
+#pragma region Camera Controls
 	void UpdateCamera(bool* _bounds, bool* _mMapShow)
 	{
 		KBM.Create(win);
@@ -113,6 +120,7 @@ public:
 		std::chrono::steady_clock::time_point _end(std::chrono::steady_clock::now());
 
 		moveV = { 0 };
+
 		rotationM = { 0 };
 		rotateX = 0;
 		rotateY = 0;
@@ -134,7 +142,6 @@ public:
 		float cameraPreset1 = 0;
 		float cameraPreset2 = 0;
 		float cameraPreset3 = 0;
-		float cameraRESET = 0;
 		float volUP = 0;
 		float volDOWN = 0;
 		float sFX = 0;
@@ -144,8 +151,11 @@ public:
 		float musicToggle = 0;
 
 		bool connected = false;
+
+
 		GW::GReturn result;
 		Control.IsConnected(0, connected);
+
 		if (connected)
 		{
 			Control.GetState(0, G_LEFT_SHOULDER_BTN, RollLeft);
@@ -163,14 +173,13 @@ public:
 			};
 			if (boost > 0)
 			{
-				speed = 500;
+				speed = 100;
 			}
 		}
 		KBM.GetState(G_KEY_Q, RollLeft);
 		KBM.GetState(G_KEY_1, cameraPreset1);
 		KBM.GetState(G_KEY_2, cameraPreset2);
 		KBM.GetState(G_KEY_3, cameraPreset3);
-		KBM.GetState(G_KEY_ESCAPE, cameraRESET);
 		KBM.GetState(G_KEY_E, RollRight);
 		KBM.GetState(G_KEY_F, sFX);
 		KBM.GetState(G_KEY_R, renderBounds);
@@ -350,13 +359,51 @@ public:
 		{
 			moveV.y = (-speed * duration) * Up;
 		};
+
 		Math.RotationYawPitchRollF(0, 0, rotateZ, rotationM);
 		Math.RotateYLocalF(rotationM, rotateX, rotationM);
 		Math.RotateXGlobalF(rotationM, rotateY, rotationM);
-
-		Math.TranslateGlobalF(view_copy, moveV, view_copy);
+		if (!collided)
+		{
+			Math.TranslateGlobalF(view_copy, moveV, view_copy);
+			LastMove = moveV;
+		}
+		else
+		{
+			if (!pressed)
+			{
+				SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
+				SFX.Play();
+				pressed = true;
+			}
+			if (LastMove.x > 0)
+			{
+				LastMove.x = -LastMove.x - 0.1f;
+			}
+			else if (LastMove.x < 0)
+			{
+				LastMove.x = -LastMove.x + 0.1f;
+			}
+			if (LastMove.y > 0)
+			{
+				LastMove.y = -LastMove.y - 0.1f;
+			}
+			else if (LastMove.y < 0)
+			{
+				LastMove.y = -LastMove.y + 0.1f;
+			}
+			if (LastMove.z > 0)
+			{
+				LastMove.z = -LastMove.z - 0.1f;
+			}
+			else if (LastMove.z < 0)
+			{
+				LastMove.z = -LastMove.z + 0.1f;
+			}
+			Math.TranslateGlobalF(view_copy, LastMove, view_copy);
+			collided = false;
+		}
 		Math.MultiplyMatrixF(view_copy, rotationM, camerAndLights.viewMatrix);
-
 		//camera position for specular lights
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(camerAndLights.viewMatrix, temp2);
@@ -437,23 +484,22 @@ public:
 			GW::MATH::GVECTORF planeNormal = { frustumPlanes[planeID].x, frustumPlanes[planeID].y, frustumPlanes[planeID].z, 0.0f };
 			float planeConstant = frustumPlanes[planeID].w;
 
-			// Check each axis (x,y,z) to get the AABB vertex furthest away from the direction the plane is facing (plane normal)
 			GW::MATH::GVECTORF axisVert;
 
 			GW::MATH::GVECTORF pos;
 			Math.GetTranslationF(_m.worldMatrix, pos);
 			if (frustumPlanes[planeID].x < 0.0f)
-				axisVert.x = _m.AABB_List[0].x + pos.x;
+				axisVert.x = _m.AABB.min.x + pos.x;
 			else
-				axisVert.x = _m.AABB_List[1].x + pos.x;
+				axisVert.x = _m.AABB.max.x + pos.x;
 			if (frustumPlanes[planeID].y < 0.0f)
-				axisVert.y = _m.AABB_List[0].y + pos.y;
+				axisVert.y = _m.AABB.min.y + pos.y;
 			else
-				axisVert.y = _m.AABB_List[1].y + pos.y;
+				axisVert.y = _m.AABB.max.y + pos.y;
 			if (frustumPlanes[planeID].z < 0.0f)
-				axisVert.z = _m.AABB_List[0].z + pos.z;
+				axisVert.z = _m.AABB.min.z + pos.z;
 			else
-				axisVert.z = _m.AABB_List[1].z + pos.z;
+				axisVert.z = _m.AABB.max.z + pos.z;
 			float result;
 			Math2.DotF(planeNormal, axisVert, result);
 			if (result + planeConstant < 0.0f)
@@ -487,6 +533,7 @@ public:
 		ID3D12Device* creator;
 		d3d.GetDevice((void**)&creator);
 		KBM.Create(win);
+		Collision.Create();
 
 #pragma region Matricies and Scene Data
 		//Create Matrixes
@@ -504,7 +551,7 @@ public:
 		//projection
 		float aspect;
 		d3d.GetAspectRatio(aspect);
-		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 1000, projM);
+		Math.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN_F(65), aspect, 0.1f, 200, projM);
 
 		GW::MATH::GVector::NormalizeF(light_direction, camerAndLights.sunDirection);
 		//camerAndLights.sunDirection = light_direction;
@@ -527,6 +574,8 @@ public:
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(temp, temp2);
 		camerAndLights.camPOS = temp2;
+
+		GW::MATH::GSPHEREF CameraCollider = { camerAndLights.camPOS.x,camerAndLights.camPOS.y,camerAndLights.camPOS.z, 0.5f };
 #pragma endregion
 
 		DXGI_SWAP_CHAIN_DESC sw_desc;
@@ -597,7 +646,7 @@ public:
 				v.nrm.z = files.meshAndMaterialData[i].vertices[j].nrm.z;
 				M.addToVertList(v);
 			}
-			M.GenerateBounds(M.vertList);
+			M.AABB = M.CreateAABB(M.vertList);
 			M.createVertexBuffer(creator);
 			M.createBoundingVertexBuffer(creator);
 
@@ -610,7 +659,6 @@ public:
 
 			M.createIndexBuffer(creator);
 			M.createBoundingIndexBuffer(creator);
-			M.AABB_List = M.CreateAABB(M.vertList);
 
 			CompleteModelList.push_back(M);
 		}
@@ -721,6 +769,7 @@ public:
 		Music.Create("../audio/music1.wav", Sounds, volume);
 		Music.Play();
 
+
 	}
 #pragma endregion
 
@@ -728,7 +777,12 @@ public:
 
 	void Render()
 	{
-
+		GW::MATH::GMATRIXF cam;
+		GW::MATH::GVECTORF cam_pos;
+		Math.InverseF(camerAndLights.viewMatrix, cam);
+		Math.GetTranslationF(cam, cam_pos);
+		CameraCollider = { cam_pos.x,cam_pos.y,cam_pos.z, 0.1f };
+		GW::GReturn result;
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
 		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
@@ -745,6 +799,39 @@ public:
 		// now we can draw
 		for (size_t i = 0; i < CompleteModelList.size(); i++)
 		{
+			GW::MATH::GCollision::GCollisionCheck check;
+			GW::MATH::GVECTORF cameraContactPoint, modelContactPoint, Direction;
+			float distance;
+			GW::MATH::GAABBCEF AABBC;
+			GW::MATH::GVECTORF min = CompleteModelList[i].AABB.min; min.w = 1;
+			GW::MATH::GVECTORF max = CompleteModelList[i].AABB.max; max.w = 1;
+			Math.VectorXMatrixF(files.gameLevelObjects[i].pos, min, min);
+			Math.VectorXMatrixF(files.gameLevelObjects[i].pos, max, max);
+			if (min.x > max.x)
+			{
+				swap(min.x, max.x);
+			}
+			if (min.y > max.y)
+			{
+				swap(min.y, max.y);
+			}
+			if (min.z > max.z)
+			{
+				swap(min.z, max.z);
+			}
+			if (min.w > max.w)
+			{
+				swap(min.w, max.w);
+			}
+			GW::MATH::GAABBMMF AABBMM = { min, max };
+			Collision.ConvertAABBMMToAABBCEF(AABBMM, AABBC);
+			result = Collision.IntersectSphereToAABBF(CameraCollider, AABBC, check, cameraContactPoint, modelContactPoint, Direction, distance);
+			if (check == GW::MATH::GCollision::GCollisionCheck::COLLISION)
+			{
+				//int hold = 0;
+				//std::cout << "COLLISION with " << CompleteModelList[i].modelName << "!\n";
+				collided = true;
+			}
 			if (CompleteModelList[i].modelType != "MESH")
 			{
 				continue;
@@ -780,6 +867,9 @@ public:
 				}
 			}
 		}
+
+
+
 		// release temp handles
 		cmd->Release();
 	}
@@ -879,6 +969,7 @@ public:
 			CompleteModelList[i].BoundingconstantBuffer->Map(0, &CD3DX12_RANGE(0, 0),
 				reinterpret_cast<void**>(&transferMemoryLocation));
 			memcpy(transferMemoryLocation, &camerAndLights, sizeof(SCENE_DATA));
+			//CompleteModelList[i].boundingMesh.worldMatrix = GW::MATH::GIdentityMatrixF;
 			memcpy(transferMemoryLocation + (sizeof(SCENE_DATA) * 2),
 				&CompleteModelList[i].boundingMesh, sizeof(MESH_DATA));
 			CompleteModelList[i].BoundingconstantBuffer->Unmap(0, nullptr);

@@ -124,7 +124,7 @@ public:
 	SCENE_DATA										MiniMap;
 	GW::MATH::GMATRIXF								worldMatrix;
 	
-	std::vector<GW::MATH::GVECTORF>					AABB_List;
+	GW::MATH::GAABBMMF								AABB;
 
 
 	D3D12_VERTEX_BUFFER_VIEW						vertexView;
@@ -329,92 +329,36 @@ public:
 		BoundingconstantBuffer->Unmap(0, nullptr);
 
 	}
-	void GenerateBounds(vector<Vertex> _vList)
-	{
-		float minX = NULL;
-		float maxX = NULL;
-		float minY = NULL;
-		float maxY = NULL;
-		float minZ = NULL;
-		float maxZ = NULL;
+	
 
-		for (size_t i = 0; i < _vList.size(); i++)
+	GW::MATH::GAABBMMF CreateAABB(std::vector<Vertex>& _vList)
+	{
+		GW::MATH::GVECTORF minVertex = { FLT_MAX, FLT_MAX, FLT_MAX };
+		GW::MATH::GVECTORF maxVertex = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+		GW::MATH::GAABBMMF AABB;
+
+		for (UINT i = 0; i < _vList.size(); i++)
 		{
-			if (minX == NULL)
-			{
-				minX = _vList[i].pos.x;
-			}
-			else
-			{
-				if (_vList[i].pos.x < minX)
-				{
-					minX = _vList[i].pos.x;
-				}
-			}
-			if (maxX == NULL)
-			{
-				maxX = _vList[i].pos.x;
-			}
-			else
-			{
-				if (_vList[i].pos.x > maxX)
-				{
-					maxX = _vList[i].pos.x;
-				}
-			}
-			if (minY == NULL)
-			{
-				minY = _vList[i].pos.y;
-			}
-			else
-			{
-				if (_vList[i].pos.y < minY)
-				{
-					minY = _vList[i].pos.y;
-				}
-			}
-			if (maxY == NULL)
-			{
-				maxY = _vList[i].pos.y;
-			}
-			else
-			{
-				if (_vList[i].pos.y > maxY)
-				{
-					maxY = _vList[i].pos.y;
-				}
-			}
-			if (minZ == NULL)
-			{
-				minZ = _vList[i].pos.z;
-			}
-			else
-			{
-				if (_vList[i].pos.z < minZ)
-				{
-					minZ = _vList[i].pos.z;
-				}
-			}
-			if (maxZ == NULL)
-			{
-				maxZ = _vList[i].pos.z;
-			}
-			else
-			{
-				if (_vList[i].pos.z > maxZ)
-				{
-					maxZ = _vList[i].pos.z;
-				}
-			}
+			minVertex.x = min(minVertex.x, _vList[i].pos.x);
+			minVertex.y = min(minVertex.y, _vList[i].pos.y);
+			minVertex.z = min(minVertex.z, _vList[i].pos.z);
+
+			maxVertex.x = max(maxVertex.x, _vList[i].pos.x);
+			maxVertex.y = max(maxVertex.y, _vList[i].pos.y);
+			maxVertex.z = max(maxVertex.z, _vList[i].pos.z);
 		}
-		Vertex _1 = { VEC4(minX, maxY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _2 = { VEC4(minX, maxY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _3 = { VEC4(maxX, maxY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _4 = { VEC4(maxX, maxY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _5 = { VEC4(minX, minY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _6 = { VEC4(minX, minY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _7 = { VEC4(maxX, minY, maxZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
-		Vertex _8 = { VEC4(maxX, minY, minZ, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0)};
+		AABB.min = minVertex;
+		AABB.max = maxVertex;
+
+		Vertex _1 = { VEC4(minVertex.x, maxVertex.y, minVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _2 = { VEC4(minVertex.x, maxVertex.y, maxVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _3 = { VEC4(maxVertex.x, maxVertex.y, maxVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _4 = { VEC4(maxVertex.x, maxVertex.y, minVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _5 = { VEC4(minVertex.x, minVertex.y, minVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _6 = { VEC4(minVertex.x, minVertex.y, maxVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _7 = { VEC4(maxVertex.x, minVertex.y, maxVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
+		Vertex _8 = { VEC4(maxVertex.x, minVertex.y, minVertex.z, 1.0f),VEC4(0,0,0,0), VEC3(0,0,0) };
 		boundVList.push_back(_1);
 		boundVList.push_back(_2);
 		boundVList.push_back(_3);
@@ -437,30 +381,6 @@ public:
 		1,5,
 		2,6
 		};
-
-	}
-
-	std::vector<GW::MATH::GVECTORF> CreateAABB(std::vector<Vertex>& vertPosArray)
-	{
-		GW::MATH::GVECTORF minVertex = { FLT_MAX, FLT_MAX, FLT_MAX };
-		GW::MATH::GVECTORF maxVertex = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-
-		for (UINT i = 0; i < vertPosArray.size(); i++)
-		{
-			minVertex.x = min(minVertex.x, vertPosArray[i].pos.x);
-			minVertex.y = min(minVertex.y, vertPosArray[i].pos.y);
-			minVertex.z = min(minVertex.z, vertPosArray[i].pos.z);
-
-			//Get the largest vertex 
-			maxVertex.x = max(maxVertex.x, vertPosArray[i].pos.x);
-			maxVertex.y = max(maxVertex.y, vertPosArray[i].pos.y);
-			maxVertex.z = max(maxVertex.z, vertPosArray[i].pos.z);
-		}
-		std::vector<GW::MATH::GVECTORF> AABB;
-
-		AABB.push_back(minVertex);
-		AABB.push_back(maxVertex);
-
 		return AABB;
 	}
 };

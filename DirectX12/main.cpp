@@ -29,12 +29,28 @@ bool miniMap = true;
 // lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
 {
+	std::cout << "Christopher Wiedeman Project D3D12\n------------------------------------------------\n\n";
+	std::cout << "Controls:\n";
+	std::cout << "Hold left mouse button to move camera\n";
+	std::cout << "'WASD' movement\n";
+	std::cout << "'Q' and 'E' to roll\n";
+	std::cout << "'Space' up\n";
+	std::cout << "'Left CTRL' down\n";
+	std::cout << "'Left Shift' + direction boosts speed\n";
+	std::cout << "'R' toggle volume/collision boxes\n";
+	std::cout << "'+' and '-' (numpad) music volume controls\n";
+	std::cout << "'P' pauses music\n";
+	std::cout << "'M' toggles MiniMap\n";
+	std::cout << "'C' shows frustum culling on MiniMap\n";
+	std::cout << "'F' makes bonk sound... or just run into something\n";
+	std::cout << "'1', '2', and '3' change MiniMap Views\n\n\n";
+	std::cout << "***Controller support is untested***\n";
 	GWindow win;
 	GEventResponder msgs;
 	GDirectX12Surface d3d12;
-	if (+win.Create(0, 0, 800, 600, GWindowStyle::FULLSCREENBORDERED))
+	if (+win.Create(0, 0, 800, 600, GWindowStyle::WINDOWEDBORDERED))
 	{
-		float clr[] = { 135.0f / 256.0f, 206.0f / 256.0f, 235.0f / 256.0f, 1.0f }; // start with a jade color
+		float clr[] = { 135.0f / 256.0f, 206.0f / 256.0f, 235.0f / 256.0f, 1.0f };
 		msgs.Create([&](const GW::GEvent& e) {
 			GW::SYSTEM::GWindow::Events q;
 		//if (+e.Read(q) && q == GWindow::Events::RESIZE)
