@@ -105,9 +105,9 @@ public:
 	float mouseY;
 	double duration = 0;
 	float speed = 0;
-	double mSpeed = 2;
-	double defaultSpeed = 10;
-	float boostSpeed = 50;
+	double mSpeed = 1;
+	double defaultSpeed = 5;
+	float boostSpeed = 25;
 	bool pressed = false;
 	float pressTimer = 0;
 	std::chrono::steady_clock::time_point _start;
@@ -262,12 +262,12 @@ public:
 
 		if (RollLeft > 0)
 		{
-			rotateZ = -(speed * duration) / 2;
+			rotateZ = -(speed * duration) / 4;
 			//std::cout << "Z Key: " << Zf << "\n";
 		};
 		if (RollRight > 0)
 		{
-			rotateZ = (speed * duration) / 2;
+			rotateZ = (speed * duration) / 4;
 			//std::cout << "C Key: " << Cf << "\n";
 		};
 		if (boost > 0)
@@ -434,15 +434,11 @@ public:
 		if (pressed)
 		{
 			pressTimer += duration;
-			if (pressTimer > 0.001f)
+			if (pressTimer > 0.5f)
 			{
 				pressed = false;
 				pressTimer = 0;
 			}
-		}
-		if (duration < 0.00001)
-		{
-			duration = 0.0001;
 		}
 		//std::cout << duration << '\n';
 	}
