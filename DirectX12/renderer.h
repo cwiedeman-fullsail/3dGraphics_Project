@@ -105,7 +105,7 @@ public:
 	float mouseY;
 	double duration = 0;
 	float speed = 0;
-	double mSpeed = 1;
+	double mSpeed = 0.5;
 	double defaultSpeed = 5;
 	float boostSpeed = 25;
 	bool pressed = false;
