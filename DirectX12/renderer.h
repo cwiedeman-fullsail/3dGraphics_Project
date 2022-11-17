@@ -103,12 +103,14 @@ public:
 
 	float mouseX;
 	float mouseY;
-	float duration = 0.0000000f;
+	double duration = 0;
 	float speed = 0;
-	float mSpeed = 20;
-	float defaultSpeed = 100;
+	double mSpeed = 2;
+	double defaultSpeed = 10;
+	float boostSpeed = 50;
 	bool pressed = false;
 	float pressTimer = 0;
+	std::chrono::steady_clock::time_point _start;
 #pragma endregion
 
 #pragma region Camera Controls
@@ -118,7 +120,7 @@ public:
 		Control.Create();
 
 		std::chrono::steady_clock::time_point _end(std::chrono::steady_clock::now());
-
+		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_end - _start).count();
 		moveV = { 0 };
 
 		rotationM = { 0 };
@@ -270,7 +272,7 @@ public:
 		};
 		if (boost > 0)
 		{
-			speed = 2000;
+			speed = boostSpeed;
 		}
 		if (miniMapShow > 0)
 		{
@@ -391,27 +393,27 @@ public:
 				}
 				if (LastMove.x > 0)
 				{
-					LastMove.x = -LastMove.x - 0.1f;
+					LastMove.x = -LastMove.x - 0.1;
 				}
 				else if (LastMove.x < 0)
 				{
-					LastMove.x = -LastMove.x + 0.1f;
+					LastMove.x = -LastMove.x + 0.1;
 				}
 				if (LastMove.y > 0)
 				{
-					LastMove.y = -LastMove.y - 0.1f;
+					LastMove.y = -LastMove.y - 0.1;
 				}
 				else if (LastMove.y < 0)
 				{
-					LastMove.y = -LastMove.y + 0.1f;
+					LastMove.y = -LastMove.y + 0.1;
 				}
 				if (LastMove.z > 0)
 				{
-					LastMove.z = -LastMove.z - 0.1f;
+					LastMove.z = -LastMove.z - 0.1;
 				}
 				else if (LastMove.z < 0)
 				{
-					LastMove.z = -LastMove.z + 0.1f;
+					LastMove.z = -LastMove.z + 0.1;
 				}
 				Math.TranslateGlobalF(view_copy, LastMove, view_copy);
 				collided = false;
@@ -427,8 +429,8 @@ public:
 		GW::MATH::GVECTORF temp2;
 		Math.GetTranslationF(camerAndLights.viewMatrix, temp2);
 		camerAndLights.camPOS = temp2;
-		std::chrono::steady_clock::time_point _start(std::chrono::steady_clock::now());
-		duration = std::chrono::duration_cast<std::chrono::duration<float>>(_start - _end).count();
+		_start = std::chrono::steady_clock::now();
+		
 		if (pressed)
 		{
 			pressTimer += duration;
