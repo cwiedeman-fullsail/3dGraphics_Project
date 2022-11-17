@@ -173,7 +173,7 @@ public:
 			};
 			if (boost > 0)
 			{
-				speed = 100;
+				speed = 50;
 			}
 		}
 		KBM.GetState(G_KEY_Q, RollLeft);
@@ -515,7 +515,7 @@ public:
 	{
 
 		//set h2b files read folder
-		level1.TXTname = "../assets/GameLevelTEST.txt";
+		level1.TXTname = "../assets/GameLevel.txt";
 		level1.H2Bfolder = "assets";
 		level2.TXTname = "../Test/GameLevel2.txt";
 		level2.H2Bfolder = "Test";
