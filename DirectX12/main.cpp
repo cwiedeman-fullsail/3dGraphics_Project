@@ -16,17 +16,13 @@
 #include "renderer.h"
 
 
-
-// open some namespaces to compact the code a bit
 using namespace GW;
 using namespace CORE;
 using namespace SYSTEM;
 using namespace GRAPHICS;
-//bool changeLevel = false;
 bool renderBoundries = false;
 bool miniMap = true;
 
-// lets pop a window and use D3D12 to clear to a jade colored screen
 int main()
 {
 	std::cout << "Christopher Wiedeman Project D3D12\n------------------------------------------------\n\n";
@@ -38,6 +34,7 @@ int main()
 	std::cout << "'Left CTRL' down\n";
 	std::cout << "'Left Shift' + direction boosts speed\n";
 	std::cout << "'R' toggle volume/collision boxes\n";
+	std::cout << "'TAB' toggle collisions\n";
 	std::cout << "'+' and '-' (numpad) music volume controls\n";
 	std::cout << "'P' pauses music\n";
 	std::cout << "'M' toggles MiniMap\n";

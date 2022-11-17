@@ -35,7 +35,7 @@ vector<Model> CompleteModelList;
 vector<D3D12_VIEWPORT> views;
 vector<GW::MATH::GVECTORF>FrustumPlane;
 bool culling = false;
-
+bool canCollid = true;
 
 
 
@@ -149,6 +149,7 @@ public:
 		float cull = 0;
 		float miniMapShow = 0;
 		float musicToggle = 0;
+		float Ccollide = 0;
 
 		bool connected = false;
 
@@ -189,6 +190,7 @@ public:
 		KBM.GetState(G_KEY_NUMPAD_ADD, volUP);
 		KBM.GetState(G_KEY_NUMPAD_SUBTRACT, volDOWN);
 		KBM.GetState(G_KEY_LEFTSHIFT, boost);
+		KBM.GetState(G_KEY_TAB, Ccollide);
 		if (cameraPreset1 > 0)
 		{
 			eye = { 20.0f, 20.0f, -1.0f };
@@ -210,6 +212,14 @@ public:
 			at = { 0.1f, 0.1f, 0.1f };
 			up = { 0.0f, 1.0f, 0.0f };
 			Math.LookAtLHF(eye, at, up, miniMap.viewMatrix);
+		}
+		if (Ccollide > 0)
+		{
+			if (!pressed)
+			{
+				canCollid = !canCollid;
+				pressed = true;
+			}
 		}
 		if (volUP > 0)
 		{
@@ -363,45 +373,54 @@ public:
 		Math.RotationYawPitchRollF(0, 0, rotateZ, rotationM);
 		Math.RotateYLocalF(rotationM, rotateX, rotationM);
 		Math.RotateXGlobalF(rotationM, rotateY, rotationM);
-		if (!collided)
+		if (canCollid)
 		{
-			Math.TranslateGlobalF(view_copy, moveV, view_copy);
-			LastMove = moveV;
+
+			if (!collided)
+			{
+				Math.TranslateGlobalF(view_copy, moveV, view_copy);
+				LastMove = moveV;
+			}
+			else
+			{
+				if (!pressed)
+				{
+					SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
+					SFX.Play();
+					pressed = true;
+				}
+				if (LastMove.x > 0)
+				{
+					LastMove.x = -LastMove.x - 0.1f;
+				}
+				else if (LastMove.x < 0)
+				{
+					LastMove.x = -LastMove.x + 0.1f;
+				}
+				if (LastMove.y > 0)
+				{
+					LastMove.y = -LastMove.y - 0.1f;
+				}
+				else if (LastMove.y < 0)
+				{
+					LastMove.y = -LastMove.y + 0.1f;
+				}
+				if (LastMove.z > 0)
+				{
+					LastMove.z = -LastMove.z - 0.1f;
+				}
+				else if (LastMove.z < 0)
+				{
+					LastMove.z = -LastMove.z + 0.1f;
+				}
+				Math.TranslateGlobalF(view_copy, LastMove, view_copy);
+				collided = false;
+			}
 		}
 		else
 		{
-			if (!pressed)
-			{
-				SFX.Create("../audio/Bonk.wav", Sounds, 0.1f);
-				SFX.Play();
-				pressed = true;
-			}
-			if (LastMove.x > 0)
-			{
-				LastMove.x = -LastMove.x - 0.1f;
-			}
-			else if (LastMove.x < 0)
-			{
-				LastMove.x = -LastMove.x + 0.1f;
-			}
-			if (LastMove.y > 0)
-			{
-				LastMove.y = -LastMove.y - 0.1f;
-			}
-			else if (LastMove.y < 0)
-			{
-				LastMove.y = -LastMove.y + 0.1f;
-			}
-			if (LastMove.z > 0)
-			{
-				LastMove.z = -LastMove.z - 0.1f;
-			}
-			else if (LastMove.z < 0)
-			{
-				LastMove.z = -LastMove.z + 0.1f;
-			}
-			Math.TranslateGlobalF(view_copy, LastMove, view_copy);
-			collided = false;
+			Math.TranslateGlobalF(view_copy, moveV, view_copy);
+			LastMove = moveV;
 		}
 		Math.MultiplyMatrixF(view_copy, rotationM, camerAndLights.viewMatrix);
 		//camera position for specular lights
@@ -517,12 +536,12 @@ public:
 		//set h2b files read folder
 		level1.TXTname = "../assets/GameLevel.txt";
 		level1.H2Bfolder = "assets";
-		level2.TXTname = "../Test/GameLevel2.txt";
-		level2.H2Bfolder = "Test";
+		//level2.TXTname = "../Test/GameLevel2.txt";
+		//level2.H2Bfolder = "Test";
 
 
 		levels.push_back(level1);
-		levels.push_back(level2);
+		//levels.push_back(level2);
 
 		string gameLevelPath = levels[currentLevel - 1].TXTname;
 		files.h2BLocationFolder = levels[currentLevel - 1].H2Bfolder;
@@ -781,7 +800,7 @@ public:
 		GW::MATH::GVECTORF cam_pos;
 		Math.InverseF(camerAndLights.viewMatrix, cam);
 		Math.GetTranslationF(cam, cam_pos);
-		CameraCollider = { cam_pos.x,cam_pos.y,cam_pos.z, 0.1f };
+		CameraCollider = { cam_pos.x,cam_pos.y,cam_pos.z, 1.0f };
 		GW::GReturn result;
 		// grab the context & render target
 		ID3D12GraphicsCommandList* cmd;
